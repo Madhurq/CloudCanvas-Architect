@@ -28,10 +28,6 @@ const PRICING_MODELS = [
 ];
 
 function App() {
-<<<<<<< HEAD
-  const { showConfigModal, clearCanvas, region, setRegion, pricingModel, setPricingModel, exportArchitecture, importArchitecture, deleteSelected, undo, redo, toggleTheme, theme } = useStore();
-  const { user, logout } = useAuth();
-=======
   const {
     showConfigModal,
     clearCanvas,
@@ -50,7 +46,6 @@ function App() {
     logout: storeLogout,
   } = useStore();
   const { user, logout: authLogout } = useAuth();
->>>>>>> ff6790e6c49855684895171c4d70d8284b248c06
   const navigate = useNavigate();
   const [pricingStatus, setPricingStatus] = useState({ loading: true, source: null });
   const [showTemplates, setShowTemplates] = useState(false);
@@ -59,14 +54,11 @@ function App() {
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
   const fileInputRef = useRef(null);
 
-<<<<<<< HEAD
-=======
   // Bootstrap session when tokens are present
   useEffect(() => {
     initializeSession();
   }, [initializeSession]);
 
->>>>>>> ff6790e6c49855684895171c4d70d8284b248c06
   const handleLogout = async () => {
     try {
       await logout();
