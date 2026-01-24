@@ -96,3 +96,64 @@ export const DATA_TRANSFER_PRICES = {
     interAZ: 0.01,
     sameAZPrivate: 0
 };
+
+// VPC Pricing (per hour)
+export const VPC_PRICES = {
+    'us-east-1': {
+        hourly: 0.07,                      // VPC hourly cost
+        natGateway: 0.045,                 // per NAT Gateway hour
+        natGatewayDataProcessing: 0.045,   // per GB of data processed by NAT
+        vpcFlowLogs: 0.06,                 // per GB ingested
+    }
+};
+
+// Elastic IP Pricing (per hour when not in use, free when attached)
+export const ELASTIC_IP_PRICES = {
+    'us-east-1': {
+        hourlyUnused: 0.005,               // $0.005/hour when not associated
+        hourlyAssociated: 0,               // Free when associated
+    }
+};
+
+// NAT Gateway Data Transfer
+export const NAT_GATEWAY_PRICES = {
+    'us-east-1': {
+        hourly: 0.045,                     // $0.045/hour
+        dataProcessing: 0.045              // $0.045/GB
+    }
+};
+
+// VPC Subnet IP Allocation Cost (minimal, based on CIDR size)
+export const SUBNET_IP_PRICING = {
+    'us-east-1': {
+        costPerIP: 0,                      // IPs within VPC are free, tracked via VPC cost
+    }
+};
+
+// Lambda Data Transfer
+export const LAMBDA_DATA_TRANSFER = {
+    'us-east-1': {
+        firstGB: 1,                        // First 1GB free per month
+        overagePerGB: 0.09                 // $0.09/GB after free tier
+    }
+};
+
+// S3 Data Transfer
+export const S3_DATA_TRANSFER_PRICES = {
+    'us-east-1': {
+        inbound: 0,                        // Free
+        outbound: {
+            'first-10TB': 0.09,
+            '10-100TB': 0.085,
+            'over-100TB': 0.08
+        }
+    }
+};
+
+// API Gateway Data Transfer
+export const API_GATEWAY_DATA_TRANSFER = {
+    'us-east-1': {
+        requestCost: 0.03,                 // $0.03 per million requests (implicit transfer)
+        dataOutbound: 0.09                 // $0.09/GB for responses
+    }
+};

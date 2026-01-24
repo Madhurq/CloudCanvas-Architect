@@ -79,6 +79,20 @@ const useStore = create((set, get) => ({
     region: persisted.region,
     pricingModel: persisted.pricingModel,
 
+    // VPC Configuration state
+    vpcConfig: {
+        natGateways: 0,
+        natDataProcessingGB: 0,
+        unusedElasticIPs: 0,
+        flowLogsGB: 0,
+        subnets: 1,
+        totalIPs: 256
+    },
+
+    // Data transfer tracking
+    includeDataTransfer: true,
+    includeVPC: true,
+
     // Theme state
     theme: persisted.theme,
 
@@ -160,6 +174,8 @@ const useStore = create((set, get) => ({
         const service = awsServices[serviceType];
         if (!service) return;
 
+        const currentRegion = get().region; // Get current global region as default
+
         const newNode = {
             id: getId(),
             type: 'awsService',
@@ -169,6 +185,7 @@ const useStore = create((set, get) => ({
                 serviceType: service.id,
                 icon: service.icon,
                 color: service.color,
+                region: currentRegion, // Add region to node data
                 config: { ...service.defaultConfig },
             },
         };
@@ -218,6 +235,17 @@ const useStore = create((set, get) => ({
             nodes: state.nodes.map((node) =>
                 node.id === nodeId
                     ? { ...node, data: { ...node.data, config: { ...node.data.config, ...config } } }
+                    : node
+            ),
+        }));
+    },
+
+    // Update node region
+    updateNodeRegion: (nodeId, region) => {
+        set((state) => ({
+            nodes: state.nodes.map((node) =>
+                node.id === nodeId
+                    ? { ...node, data: { ...node.data, region } }
                     : node
             ),
         }));
@@ -377,6 +405,23 @@ const useStore = create((set, get) => ({
         localStorage.setItem('aws-calc-theme', theme);
         document.documentElement.setAttribute('data-theme', theme);
         set({ theme });
+    },
+
+    // Update VPC configuration
+    setVPCConfig: (config) => {
+        set((state) => ({
+            vpcConfig: { ...state.vpcConfig, ...config }
+        }));
+    },
+
+    // Toggle data transfer cost inclusion
+    setIncludeDataTransfer: (include) => {
+        set({ includeDataTransfer: include });
+    },
+
+    // Toggle VPC cost inclusion
+    setIncludeVPC: (include) => {
+        set({ includeVPC: include });
     },
 }));
 
