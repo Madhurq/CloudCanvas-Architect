@@ -26,13 +26,18 @@ const PRICING_MODELS = [
 ];
 
 function App() {
-  const { showConfigModal, clearCanvas, region, setRegion, pricingModel, setPricingModel, exportArchitecture, importArchitecture, deleteSelected, undo, redo, toggleTheme, theme } = useStore();
+  const { showConfigModal, clearCanvas, region, setRegion, pricingModel, setPricingModel, exportArchitecture, importArchitecture, deleteSelected, undo, redo, toggleTheme, theme, initializeSession } = useStore();
   const [pricingStatus, setPricingStatus] = useState({ loading: true, source: null });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Bootstrap session when tokens are present
+  useEffect(() => {
+    initializeSession();
+  }, [initializeSession]);
 
   // Initialize AWS pricing on app startup
   useEffect(() => {
