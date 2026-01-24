@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 import ServicePalette from './components/ServicePalette';
 import DesignCanvas from './components/DesignCanvas';
 import CostPanel from './components/CostPanel';
@@ -27,12 +29,23 @@ const PRICING_MODELS = [
 
 function App() {
   const { showConfigModal, clearCanvas, region, setRegion, pricingModel, setPricingModel, exportArchitecture, importArchitecture, deleteSelected, undo, redo, toggleTheme, theme } = useStore();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [pricingStatus, setPricingStatus] = useState({ loading: true, source: null });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
   const fileInputRef = useRef(null);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   // Initialize AWS pricing on app startup
   useEffect(() => {
@@ -179,7 +192,7 @@ function App() {
             </span>
           )}
         </div>
-        
+
         <div className="header-center">
           <div className="header-controls">
             <div className="control-group">
@@ -235,6 +248,16 @@ function App() {
           <button className="btn btn-ghost" onClick={toggleTheme} title="Toggle Theme">
             {theme === 'dark' ? '🌞' : '🌙'}
           </button>
+          {user && (
+            <div className="user-menu">
+              <span className="user-email" title={user.email}>
+                {user.email?.split('@')[0]}
+              </span>
+              <button className="btn btn-ghost btn-logout" onClick={handleLogout} title="Sign Out">
+                🚪 Logout
+              </button>
+            </div>
+          )}
           <input
             ref={fileInputRef}
             type="file"
@@ -275,14 +298,14 @@ function App() {
                 Share your architecture design with others using this link:
               </p>
               <div className="share-url-container">
-                <input 
-                  type="text" 
-                  value={shareUrl} 
-                  readOnly 
+                <input
+                  type="text"
+                  value={shareUrl}
+                  readOnly
                   className="share-url-input"
                   onClick={(e) => e.target.select()}
                 />
-                <button 
+                <button
                   className={`btn btn-primary ${shareUrlCopied ? 'copied' : ''}`}
                   onClick={handleCopyShareUrl}
                 >
@@ -307,7 +330,7 @@ function App() {
               : `Using cached prices (${region} on-demand rates)`}
         </p>
         <p className="keyboard-shortcuts">
-          Shortcuts: <kbd>Delete</kbd> remove • <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo • 
+          Shortcuts: <kbd>Delete</kbd> remove • <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo •
           <kbd>Ctrl+E</kbd> export • <kbd>Ctrl+K</kbd> templates • <kbd>Ctrl+Shift+C</kbd> clear
         </p>
       </footer>

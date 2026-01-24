@@ -288,6 +288,37 @@ body {
   color: var(--text-primary);
 }
 
+/* User Menu in Header */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border-color);
+  margin-left: 4px;
+}
+
+.user-email {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  color: var(--accent-danger);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-logout:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: var(--accent-danger);
+  color: var(--accent-danger);
+}
+
 /* ===== Service Palette - Compact Design ===== */
 .service-palette {
   padding: 16px;
@@ -556,7 +587,8 @@ body {
 .node-label {
   font-size: 0.875rem;
   font-weight: 600;
-  flex: 1; /* Allow label to grow and push badge to right */
+  flex: 1;
+  /* Allow label to grow and push badge to right */
 }
 
 /* Multi-Region Badge Styling */
@@ -583,27 +615,32 @@ body {
 
 /* Region Color Coding by Continent */
 .node-region-badge[data-region^="us"] {
-  background: rgba(59, 130, 246, 0.3); /* Blue for US regions */
+  background: rgba(59, 130, 246, 0.3);
+  /* Blue for US regions */
   border-color: rgba(59, 130, 246, 0.6);
 }
 
 .node-region-badge[data-region^="eu"] {
-  background: rgba(16, 185, 129, 0.3); /* Green for EU regions */
+  background: rgba(16, 185, 129, 0.3);
+  /* Green for EU regions */
   border-color: rgba(16, 185, 129, 0.6);
 }
 
 .node-region-badge[data-region^="ap"] {
-  background: rgba(245, 158, 11, 0.3); /* Orange for Asia-Pacific regions */
+  background: rgba(245, 158, 11, 0.3);
+  /* Orange for Asia-Pacific regions */
   border-color: rgba(245, 158, 11, 0.6);
 }
 
 .node-region-badge[data-region^="sa"] {
-  background: rgba(236, 72, 153, 0.3); /* Pink for South America */
+  background: rgba(236, 72, 153, 0.3);
+  /* Pink for South America */
   border-color: rgba(236, 72, 153, 0.6);
 }
 
 .node-region-badge[data-region^="ca"] {
-  background: rgba(139, 92, 246, 0.3); /* Purple for Canada */
+  background: rgba(139, 92, 246, 0.3);
+  /* Purple for Canada */
   border-color: rgba(139, 92, 246, 0.6);
 }
 
