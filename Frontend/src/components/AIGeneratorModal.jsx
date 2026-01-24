@@ -3,8 +3,7 @@ import { generateArchitecture } from '../services/aiDesignService'; // Import th
 import useStore from '../store/useStore';
 
 const AIGeneratorModal = ({ isOpen, onClose }) => {
-  const [prompt, setPrompt] = useState('');
-  const [apiKey, setApiKey] = useState("AIzaSyCuJ2zLB6Iw3tTi0dmAb_oTcWliSfpLkh0");
+  const [prompt, setPrompt] = useState(''); 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -19,16 +18,13 @@ const AIGeneratorModal = ({ isOpen, onClose }) => {
       setError("Google Gemini API Key is required for this mode.");
       return;
     }
-
-    // Save key for convenience
-    localStorage.setItem('gemini_api_key', apiKey);
     
     setIsLoading(true);
     setError('');
 
     try {
       // Call the AI Service
-      const { nodes, edges } = await generateArchitecture(prompt, apiKey);
+      const { nodes, edges } = await generateArchitecture(prompt);
 
       if (nodes.length === 0) {
         throw new Error("AI returned no valid services. Please try a different description.");
@@ -74,29 +70,6 @@ const AIGeneratorModal = ({ isOpen, onClose }) => {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
             />
-          </div>
-
-          <div className="control-group" style={{ marginBottom: '15px' }}>
-             <label style={{ display: 'block', marginBottom: '5px', fontSize: '0.9em', color: 'var(--text-secondary)' }}>
-               Google Gemini API Key
-             </label>
-            <input 
-              type="password" 
-              placeholder="Paste your Gemini API Key here"
-              className="select-input"
-              style={{ 
-                width: '100%', 
-                padding: '8px', 
-                background: 'var(--bg-secondary)', 
-                color: 'var(--text-primary)', 
-                border: '1px solid var(--border-color)' 
-              }}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-            <small style={{ color: 'var(--text-secondary)', fontSize: '0.8em', display: 'block', marginTop: '4px' }}>
-              Your key is stored locally in your browser and sent directly to Google.
-            </small>
           </div>
 
           {error && (
