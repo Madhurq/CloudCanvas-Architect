@@ -5,6 +5,10 @@
   flex-direction: column;
   gap: 16px;
   padding: 16px 0;
+  overflow-x: auto;
+  padding-right: 4px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* Summary Cards Grid */
@@ -258,7 +262,7 @@
   font-weight: 700;
 }
 
-.savings-row + .savings-row {
+.savings-row+.savings-row {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--border-color);

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { awsServices, getConnectionDefault } from '../data/awsServices';
+import { awsServices, getConnectionDefault, containerTypes } from '../data/awsServices';
 import { calculateTotalCost } from '../utils/costCalculator';
 import apiClient from '../services/apiClient';
 
@@ -14,13 +14,13 @@ const MAX_HISTORY = 50;
 const pushToHistory = (state) => {
     // Remove any redo history if we make a new change
     history = history.slice(0, historyIndex + 1);
-    
+
     // Add new state to history
     history.push({
         nodes: JSON.parse(JSON.stringify(state.nodes)),
         edges: JSON.parse(JSON.stringify(state.edges))
     });
-    
+
     // Limit history size
     if (history.length > MAX_HISTORY) {
         history.shift();
@@ -183,24 +183,47 @@ const useStore = create((set, get) => ({
     },
 
     // Add new node when service is dropped
-    addNode: (serviceType, position) => {
-        const service = awsServices[serviceType];
+    addNode: (serviceType, position, parentNode = null) => {
+        // Check if it's a container type
+        const isContainer = containerTypes && containerTypes[serviceType];
+        const service = isContainer ? containerTypes[serviceType] : awsServices[serviceType];
+
         if (!service) return;
 
-        const currentRegion = get().region; // Get current global region as default
+        const currentRegion = get().region;
 
+        // Create node based on type (container or regular service)
         const newNode = {
             id: getId(),
-            type: 'awsService',
+            type: isContainer ? 'groupNode' : 'awsService',
             position,
             data: {
-                label: service.name,
+                label: service.defaultConfig?.name || service.name,
                 serviceType: service.id,
                 icon: service.icon,
                 color: service.color,
-                region: currentRegion, // Add region to node data
+                region: currentRegion,
                 config: { ...service.defaultConfig },
+                // Container-specific data
+                ...(isContainer && {
+                    containerType: service.containerType,
+                    isContainer: true,
+                    minWidth: service.defaultSize?.width || 300,
+                    minHeight: service.defaultSize?.height || 200,
+                }),
             },
+            // Set size for container nodes
+            ...(isContainer && {
+                style: {
+                    width: service.defaultSize?.width || 300,
+                    height: service.defaultSize?.height || 200,
+                },
+            }),
+            // Parent relationship for nested containers
+            ...(parentNode && {
+                parentNode: parentNode,
+                extent: 'parent',
+            }),
         };
 
         set((state) => ({
@@ -335,7 +358,7 @@ const useStore = create((set, get) => ({
         if (!architecture || architecture.version !== '1.0') {
             throw new Error('Invalid or incompatible architecture file');
         }
-        
+
         set({
             nodes: architecture.nodes || [],
             edges: architecture.edges || [],
@@ -361,7 +384,7 @@ const useStore = create((set, get) => ({
     loadTemplate: (nodes, edges) => {
         // Reset nodeId for clean slate
         nodeId = 0;
-        
+
         set({
             nodes: nodes ? nodes.map(node => ({ ...node })) : [],
             edges: edges ? edges.map(edge => ({ ...edge })) : [],
@@ -375,7 +398,7 @@ const useStore = create((set, get) => ({
             return match ? Math.max(max, parseInt(match[1], 10)) : max;
         }, -1);
         nodeId = maxNodeId + 1;
-        
+
         // Push initial state to history
         pushToHistory({ nodes: nodes || [], edges: edges || [] });
     },

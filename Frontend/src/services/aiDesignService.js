@@ -3,7 +3,7 @@ import { awsServices, getConnectionDefault } from '../data/awsServices';
 
 export const generateArchitecture = async (userPrompt) => {
 
-  const ai = new GoogleGenAI({ apiKey: "AIzaSyCuJ2zLB6Iw3tTi0dmAb_oTcWliSfpLkh0" });
+  const ai = new GoogleGenAI({ apiKey: "AIzaSyDp_6w_JgOfNqilVBzfEr-3mnOoYTGPWwQ" });
 
   // 1. Build the "Menu" of valid services
   // We keep it lean to save tokens

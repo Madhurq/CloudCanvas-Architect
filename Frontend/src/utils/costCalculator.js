@@ -894,6 +894,11 @@ export const calculateTotalCost = (nodes, region = 'us-east-1', pricingModel = '
     const perRegionTotals = {};
 
     nodes.forEach(node => {
+        // Skip container nodes (VPC, Subnets, etc.) - they don't have service costs
+        if (node.data?.isContainer || node.type === 'groupNode') {
+            return;
+        }
+        
         if (node.data?.config && node.data?.serviceType) {
             const nodeRegion = node.data?.region || region;
             const cost = calculateServiceCost(node.data.serviceType, node.data.config, nodeRegion, pricingModel);
