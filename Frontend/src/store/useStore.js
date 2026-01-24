@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { awsServices, getConnectionDefault } from '../data/awsServices';
+import { calculateTotalCost } from '../utils/costCalculator';
 import apiClient from '../services/apiClient';
 
 let nodeId = 0;
@@ -581,6 +582,13 @@ const useStore = create((set, get) => ({
     // Toggle VPC cost inclusion
     setIncludeVPC: (include) => {
         set({ includeVPC: include });
+    },
+
+    // Get total monthly cost for marketplace publishing
+    getTotalMonthlyCost: () => {
+        const state = get();
+        const result = calculateTotalCost(state.nodes, state.region, state.pricingModel);
+        return result?.totalMonthly || 0;
     },
 }));
 
