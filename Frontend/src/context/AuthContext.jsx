@@ -30,7 +30,11 @@ export const AuthProvider = ({ children }) => {
 
         try {
             const idToken = await firebaseUser.getIdToken();
-            await apiClient.syncFirebaseUser(idToken);
+            const response = await apiClient.syncFirebaseUser(idToken);
+            const { accessToken, refreshToken } = response?.data || {};
+            if (accessToken) {
+                apiClient.setTokens(accessToken, refreshToken);
+            }
         } catch (error) {
             console.warn('Failed to sync user to backend:', error);
         }

@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import pool from '../config/database.js';
 import logger from '../config/logger.js';
 import admin, { firebaseInitialized } from '../config/firebaseAdmin.js';
@@ -154,7 +155,9 @@ export const syncFirebaseUser = async (req, res) => {
     `;
 
     const result = await pool.query(syncQuery, [email, uid]);
-    return res.json(formatResponse(true, { user: result.rows[0] }));
+    const user = result.rows[0];
+    const { accessToken, refreshToken } = generateTokens(user.id);
+    return res.json(formatResponse(true, { user, accessToken, refreshToken }));
 
   } catch (error) {
     // If we hit a unique constraint error (23505), just fetch the user that Request #1 just created
@@ -166,7 +169,9 @@ export const syncFirebaseUser = async (req, res) => {
           [email, uid]
         );
         if (recovery.rows.length > 0) {
-          return res.json(formatResponse(true, { user: recovery.rows[0] }));
+          const user = recovery.rows[0];
+          const { accessToken, refreshToken } = generateTokens(user.id);
+          return res.json(formatResponse(true, { user, accessToken, refreshToken }));
         }
       } catch (recoveryError) {
         logger.error('Recovery fetch failed:', recoveryError);
