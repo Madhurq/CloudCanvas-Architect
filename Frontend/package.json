@@ -13,6 +13,7 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@xyflow/react": "^12.10.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

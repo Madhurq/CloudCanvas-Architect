@@ -8,6 +8,7 @@ import useStore from './store/useStore';
 import { initializePricing, getPricingMeta } from './services/awsPricingService';
 import { downloadArchitecture, loadArchitectureFromFile, decodeArchitectureFromUrl, getShareableUrl } from './utils/exportHelper';
 import './App.css';
+import AIGeneratorModal from './components/AIGeneratorModal';
 
 const AWS_REGIONS = [
   { id: 'us-east-1', name: 'US East (N. Virginia)' },
@@ -29,6 +30,7 @@ function App() {
   const { showConfigModal, clearCanvas, region, setRegion, pricingModel, setPricingModel, exportArchitecture, importArchitecture, deleteSelected, undo, redo, toggleTheme, theme } = useStore();
   const [pricingStatus, setPricingStatus] = useState({ loading: true, source: null });
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showAIModal, setShowAIModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
@@ -217,6 +219,9 @@ function App() {
         </div>
 
         <div className="header-right">
+        <button className="btn btn-primary" onClick={() => setShowAIModal(true)} title="Generate with AI">
+            ✨ AI Design
+          </button>
           <button className="btn btn-ghost" onClick={() => setShowTemplates(true)} title="Load Template (Ctrl+K)">
             📋 Templates
           </button>
@@ -261,7 +266,7 @@ function App() {
 
       {showConfigModal && <ConfigModal />}
       <TemplateGallery isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
-
+      <AIGeneratorModal isOpen={showAIModal} onClose={() => setShowAIModal(false)} />
       {/* Share Modal */}
       {showShareModal && (
         <div className="modal-overlay" onClick={() => setShowShareModal(false)}>
