@@ -61,18 +61,21 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await logout();
-      navigate('/');
+      // Firebase logout
+      await authLogout();
     } catch (error) {
-      console.error('Logout failed:', error);
-    } finally {
-      try {
-        await storeLogout();
-      } catch (err) {
-        console.warn('Store logout failed:', err);
-      }
-      navigate('/login');
+      console.error('Firebase logout failed:', error);
     }
+
+    try {
+      // Store logout
+      await storeLogout();
+    } catch (err) {
+      console.warn('Store logout failed:', err);
+    }
+
+    // Always navigate to landing page after logout
+    navigate('/');
   };
 
   // Initialize AWS pricing on app startup
