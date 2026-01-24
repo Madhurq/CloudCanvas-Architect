@@ -111,6 +111,14 @@ class APIClient {
     this.clearTokens();
   }
 
+  // Firebase sync: link firebase user to Supabase users table
+  async syncFirebaseUser(idToken) {
+    return this.request('/api/auth/firebase-sync', {
+      method: 'POST',
+      body: JSON.stringify({ idToken }),
+    });
+  }
+
   // Architecture endpoints
   async createArchitecture(architecture) {
     return this.request('/api/architectures', {

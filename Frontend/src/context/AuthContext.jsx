@@ -8,6 +8,7 @@ import {
     onAuthStateChanged
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import apiClient from '../services/apiClient';
 
 const AuthContext = createContext(null);
 
@@ -23,9 +24,24 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Sync Firebase user to backend after auth state changes
+    const syncUserToBackend = async (firebaseUser) => {
+        if (!firebaseUser) return;
+
+        try {
+            const idToken = await firebaseUser.getIdToken();
+            await apiClient.syncFirebaseUser(idToken);
+        } catch (error) {
+            console.warn('Failed to sync user to backend:', error);
+        }
+    };
+
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            setUser(user);
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            setUser(firebaseUser);
+            if (firebaseUser) {
+                await syncUserToBackend(firebaseUser);
+            }
             setLoading(false);
         });
 
@@ -33,16 +49,22 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (email, password) => {
-        return signInWithEmailAndPassword(auth, email, password);
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        await syncUserToBackend(result.user);
+        return result;
     };
 
     const signup = async (email, password) => {
-        return createUserWithEmailAndPassword(auth, email, password);
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        await syncUserToBackend(result.user);
+        return result;
     };
 
     const loginWithGoogle = async () => {
         const provider = new GoogleAuthProvider();
-        return signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        await syncUserToBackend(result.user);
+        return result;
     };
 
     const logout = async () => {

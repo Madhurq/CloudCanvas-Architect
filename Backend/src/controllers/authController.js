@@ -1,5 +1,6 @@
 import pool from '../config/database.js';
 import logger from '../config/logger.js';
+import admin, { firebaseInitialized } from '../config/firebaseAdmin.js';
 import { hashPassword, verifyPassword, generateTokens, formatResponse } from '../utils/helpers.js';
 
 export const register = async (req, res) => {
@@ -116,5 +117,63 @@ export const getProfile = async (req, res) => {
   } catch (error) {
     logger.error('Get profile error:', error);
     res.status(500).json(formatResponse(false, null, 'Failed to fetch profile'));
+  }
+};
+
+// Sync a Firebase-authenticated user into Supabase (users table)
+// Expects: { idToken }
+export const syncFirebaseUser = async (req, res) => {
+  const { idToken } = req.body;
+  
+  // Initialize variables outside try so catch can see them
+  let email = null;
+  let uid = null;
+
+  if (!idToken) return res.status(400).json(formatResponse(false, null, 'Missing idToken'));
+
+  try {
+    if (!firebaseInitialized) {
+      return res.status(503).json(formatResponse(false, null, 'Firebase auth not configured.'));
+    }
+
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    uid = decoded.uid;
+    email = decoded.email || null;
+
+    logger.info(`Attempting sync for: ${email || uid}`);
+
+    const syncQuery = `
+      INSERT INTO users (email, provider, provider_id)
+      VALUES ($1, 'FIREBASE', $2)
+      ON CONFLICT (email) 
+      DO UPDATE SET 
+        provider_id = EXCLUDED.provider_id,
+        provider = EXCLUDED.provider,
+        last_login = CURRENT_TIMESTAMP
+      RETURNING *;
+    `;
+
+    const result = await pool.query(syncQuery, [email, uid]);
+    return res.json(formatResponse(true, { user: result.rows[0] }));
+
+  } catch (error) {
+    // If we hit a unique constraint error (23505), just fetch the user that Request #1 just created
+    if (error.code === '23505') {
+      logger.warn(`Conflict detected for ${email}, recovering...`);
+      try {
+        const recovery = await pool.query(
+          'SELECT * FROM users WHERE email = $1 OR provider_id = $2', 
+          [email, uid]
+        );
+        if (recovery.rows.length > 0) {
+          return res.json(formatResponse(true, { user: recovery.rows[0] }));
+        }
+      } catch (recoveryError) {
+        logger.error('Recovery fetch failed:', recoveryError);
+      }
+    }
+
+    logger.error(`Firebase sync error: ${error.message}`);
+    return res.status(401).json(formatResponse(false, null, 'Firebase sync failed'));
   }
 };
