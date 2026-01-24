@@ -13,6 +13,7 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@google/genai": "^1.38.0",
     "@xyflow/react": "^12.10.0",
     "firebase": "^12.8.0",
     "react": "^19.2.0",
