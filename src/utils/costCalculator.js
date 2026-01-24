@@ -3,6 +3,7 @@
  * Uses AWS Price List API pricing data (with fallback to static prices)
  */
 import { getCurrentPricing, getPrice } from '../services/awsPricingService';
+import { getInterRegionRateSync, getInternetEgressRateSync } from '../services/dataTransferPricing';
 
 // Pricing model discounts
 const PRICING_MODEL_DISCOUNTS = {
@@ -889,18 +890,26 @@ export const calculateTotalCost = (nodes, region = 'us-east-1', pricingModel = '
     const serviceCosts = [];
     const pricing = getCurrentPricing(region);
 
+    // Per-region aggregation
+    const perRegionTotals = {};
+
     nodes.forEach(node => {
         if (node.data?.config && node.data?.serviceType) {
-            const cost = calculateServiceCost(node.data.serviceType, node.data.config, region, pricingModel);
-            const onDemandCost = calculateServiceCost(node.data.serviceType, node.data.config, region, 'on-demand');
-            
+            const nodeRegion = node.data?.region || region;
+            const cost = calculateServiceCost(node.data.serviceType, node.data.config, nodeRegion, pricingModel);
+            const onDemandCost = calculateServiceCost(node.data.serviceType, node.data.config, nodeRegion, 'on-demand');
+
             totalMonthly += cost.total;
             onDemandMonthly += onDemandCost.total;
-            
+
+            // Aggregate per region
+            perRegionTotals[nodeRegion] = (perRegionTotals[nodeRegion] || 0) + cost.total;
+
             serviceCosts.push({
                 id: node.id,
                 name: node.data.label,
                 serviceType: node.data.serviceType,
+                region: nodeRegion,
                 ...cost
             });
         }
@@ -917,9 +926,161 @@ export const calculateTotalCost = (nodes, region = 'us-east-1', pricingModel = '
         savings,
         savingsPercentage,
         services: serviceCosts,
+        perRegion: perRegionTotals,
         pricingSource: pricing.source,
         pricingLastUpdated: pricing.lastUpdated,
         region,
         pricingModel
+    };
+};
+
+/**
+ * Calculate VPC costs (hourly + NAT Gateway + data transfer)
+ */
+export const calculateVPCCost = (config, region = 'us-east-1', pricingModel = 'on-demand') => {
+    const pricing = getCurrentPricing(region);
+    const vpcPricing = pricing.vpc || { hourly: 0.07, natGateway: 0.045, natGatewayDataProcessing: 0.045 };
+
+    const hoursPerMonth = 730; // Average hours per month
+    
+    // VPC hourly cost
+    const vpcHourlyCost = (vpcPricing.hourly || 0.07) * hoursPerMonth;
+    
+    // NAT Gateway costs (optional)
+    const natGatewayCost = (config.natGateways || 0) * (vpcPricing.natGateway || 0.045) * hoursPerMonth;
+    const natDataProcessingCost = (config.natDataProcessingGB || 0) * (vpcPricing.natGatewayDataProcessing || 0.045);
+    
+    // Elastic IP costs (when not in use)
+    const elasticIPCost = (config.unusedElasticIPs || 0) * (pricing.elasticIP?.hourlyUnused || 0.005) * hoursPerMonth;
+    
+    // VPC Flow Logs costs (optional)
+    const flowLogsCost = (config.flowLogsGB || 0) * (vpcPricing.vpcFlowLogs || 0.06);
+    
+    const totalCost = vpcHourlyCost + natGatewayCost + natDataProcessingCost + elasticIPCost + flowLogsCost;
+    const finalCost = applyPricingModel(totalCost, 'vpc', pricingModel);
+
+    return {
+        total: finalCost,
+        breakdown: {
+            'VPC Hourly': vpcHourlyCost,
+            'NAT Gateway': natGatewayCost,
+            'NAT Data Processing': natDataProcessingCost,
+            'Elastic IPs (unused)': elasticIPCost,
+            'VPC Flow Logs': flowLogsCost
+        },
+        priceSource: pricing.source
+    };
+};
+
+/**
+ * Calculate data transfer costs between services
+ * Handles intra-region, inter-region, and internet egress
+ * AUTO-DETECTS inter-region transfers when source and target have different regions
+ */
+export const calculateDataTransferCost = (edges, nodes, region = 'us-east-1', targetRegion = 'us-east-1', pricingModel = 'on-demand') => {
+    const pricing = getCurrentPricing(region);
+    const dataTransferPrices = pricing.dataTransfer || {
+        internetEgressFirst10TB: 0.09,
+        internetEgress10to50TB: 0.085,
+        interRegion: 0.02,
+        interAZ: 0.01,
+        sameAZPrivate: 0
+    }; // Fallbacks used only when API-backed rates not cached
+
+    let totalTransferCost = 0;
+    const breakdown = {};
+
+    edges.forEach(edge => {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        const targetNode = nodes.find(n => n.id === edge.target);
+
+        if (!sourceNode || !targetNode) return;
+
+        const bandwidthGB = edge.data?.bandwidthGB || 10; // Default 10GB/month if not specified
+        
+        // AUTO-DETECT: Check if source and target are in different regions
+        const sourceRegion = sourceNode.data?.region || region;
+        const targetRegionNode = targetNode.data?.region || region;
+        const isInterRegion = sourceRegion !== targetRegionNode;
+        
+        // Use explicit transferType if set, otherwise auto-detect based on regions
+        let transferType = edge.data?.transferType;
+        if (!transferType && isInterRegion) {
+            transferType = 'inter-region'; // Auto-detect inter-region transfer
+        } else if (!transferType) {
+            transferType = 'intra-region'; // Default to same region
+        }
+
+        let rate = 0;
+
+        if (transferType === 'internet') {
+            // Internet egress pricing (prefer API-backed tiers)
+            rate = getInternetEgressRateSync(sourceRegion, bandwidthGB);
+        } else if (transferType === 'inter-region') {
+            // Inter-region pricing (prefer API-backed per-pair rates)
+            rate = getInterRegionRateSync(sourceRegion, targetRegionNode);
+        } else if (transferType === 'inter-az') {
+            rate = dataTransferPrices.interAZ || 0.01;
+        } else {
+            // Same AZ private: free
+            rate = dataTransferPrices.sameAZPrivate || 0;
+        }
+
+        const edgeCost = bandwidthGB * rate;
+        totalTransferCost += edgeCost;
+        
+        // Show regions in breakdown if cross-region
+        const regionLabel = isInterRegion ? ` (${sourceRegion} → ${targetRegionNode})` : '';
+        breakdown[`${sourceNode.data?.label} → ${targetNode.data?.label}${regionLabel}`] = edgeCost;
+    });
+
+    const finalCost = applyPricingModel(totalTransferCost, 'data-transfer', pricingModel);
+
+    return {
+        total: finalCost,
+        breakdown,
+        priceSource: pricing.source
+    };
+};
+
+/**
+ * Calculate total cost including services, VPC, and data transfer
+ */
+export const calculateTotalArchitectureCost = (nodes, edges, region = 'us-east-1', pricingModel = 'on-demand', vpcConfig = {}, includeVPC = true, includeDataTransfer = true) => {
+    // Service costs
+    const serviceCostResult = calculateTotalCost(nodes, region, pricingModel);
+    
+    // VPC costs
+    let vpcCost = { total: 0, breakdown: {}, priceSource: 'N/A' };
+    if (includeVPC) {
+        vpcCost = calculateVPCCost(vpcConfig, region, pricingModel);
+    }
+    
+    // Data transfer costs
+    let transferCost = { total: 0, breakdown: {}, priceSource: 'N/A' };
+    if (includeDataTransfer) {
+        transferCost = calculateDataTransferCost(edges, nodes, region, region, pricingModel);
+    }
+    
+    const totalMonthly = serviceCostResult.totalMonthly + vpcCost.total + transferCost.total;
+    const totalYearly = totalMonthly * 12;
+
+    return {
+        services: serviceCostResult,
+        vpc: vpcCost,
+        dataTransfer: transferCost,
+        grandTotal: {
+            monthly: totalMonthly,
+            yearly: totalYearly,
+            breakdown: {
+                'Services': serviceCostResult.totalMonthly,
+                'VPC & Networking': vpcCost.total,
+                'Data Transfer': transferCost.total
+            }
+        },
+        region,
+        pricingModel,
+        includeVPC,
+        includeDataTransfer
     };
 };
