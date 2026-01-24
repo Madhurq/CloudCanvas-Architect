@@ -17,24 +17,24 @@ const CostPanel = () => {
         if (uniqueRegions.length === 0) return;
         Promise.all(uniqueRegions.map(r => prefetchDataTransferRates(r)))
             .then(() => setDataTransferVersion(v => v + 1))
-            .catch(() => {});
+            .catch(() => { });
     }, [nodes, region]);
 
     const costData = useMemo(() => {
         const serviceCost = calculateTotalCost(nodes, region, pricingModel);
-        
+
         // Only include VPC costs if there are services on canvas
         let vpcCost = { total: 0, breakdown: {}, priceSource: 'N/A' };
         if (includeVPC && nodes.length > 0) {
             vpcCost = calculateVPCCost(vpcConfig, region, pricingModel);
         }
-        
+
         // Only include data transfer if there are edges
         let transferCost = { total: 0, breakdown: {}, priceSource: 'N/A' };
         if (includeDataTransfer && edges.length > 0) {
             transferCost = calculateDataTransferCost(edges, nodes, region, region, pricingModel);
         }
-        
+
         return {
             services: serviceCost,
             vpc: vpcCost,
@@ -97,7 +97,7 @@ const CostPanel = () => {
 
             {/* Summary Tab */}
             {activeTab === 'summary' && (
-                <div>
+                <>
                     <div className="cost-summary">
                         <div className="cost-card monthly">
                             <span className="cost-label">Monthly</span>
@@ -112,7 +112,7 @@ const CostPanel = () => {
                     {/* Cost Breakdown by Category */}
                     <div className="cost-category-breakdown">
                         <h3>Cost Breakdown</h3>
-                        
+
                         {/* Services */}
                         <div className="cost-category">
                             <div className="category-header">
@@ -188,7 +188,7 @@ const CostPanel = () => {
                             ⚠️ Estimates based on on-demand pricing. Actual costs may vary.
                         </p>
                     </div>
-                </div>
+                </>
             )}
 
             {/* VPC Configuration Tab */}

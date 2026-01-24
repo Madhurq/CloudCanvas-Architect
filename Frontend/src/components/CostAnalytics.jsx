@@ -1,214 +1,259 @@
-import { useMemo, useState, useEffect } from 'react';
-import useStore from '../store/useStore';
-import { calculateTotalCost, calculateVPCCost, calculateDataTransferCost } from '../utils/costCalculator';
-import CostAnalytics from './CostAnalytics';
-import OptimizationPanel from './OptimizationPanel';
-import VPCConfigPanel from './VPCConfigPanel';
-import { prefetchDataTransferRates } from '../services/dataTransferPricing';
+import { useMemo } from 'react';
+import '../styles/CostAnalytics.css';
 
-const CostPanel = () => {
-    const { nodes, edges, region, pricingModel, vpcConfig, includeVPC, includeDataTransfer } = useStore();
-    const [activeTab, setActiveTab] = useState('summary'); // 'summary', 'vpc', 'analytics', or 'optimization'
-    const [dataTransferVersion, setDataTransferVersion] = useState(0);
+const CostAnalytics = ({ costData }) => {
+    if (!costData) {
+        return (
+            <div className="cost-analytics">
+                <div className="empty-state">
+                    <p>No cost data available</p>
+                    <p className="empty-hint">Add services to see analytics</p>
+                </div>
+            </div>
+        );
+    }
 
-    // Prefetch API-backed data transfer rates for all regions used by nodes
-    useEffect(() => {
-        const uniqueRegions = Array.from(new Set(nodes.map(n => n.data?.region || region)));
-        if (uniqueRegions.length === 0) return;
-        Promise.all(uniqueRegions.map(r => prefetchDataTransferRates(r)))
-            .then(() => setDataTransferVersion(v => v + 1))
-            .catch(() => {});
-    }, [nodes, region]);
+    const { services, vpc, dataTransfer, total, totalYearly } = costData;
 
-    const costData = useMemo(() => {
-        const serviceCost = calculateTotalCost(nodes, region, pricingModel);
-        
-        // Only include VPC costs if there are services on canvas
-        let vpcCost = { total: 0, breakdown: {}, priceSource: 'N/A' };
-        if (includeVPC && nodes.length > 0) {
-            vpcCost = calculateVPCCost(vpcConfig, region, pricingModel);
-        }
-        
-        // Only include data transfer if there are edges
-        let transferCost = { total: 0, breakdown: {}, priceSource: 'N/A' };
-        if (includeDataTransfer && edges.length > 0) {
-            transferCost = calculateDataTransferCost(edges, nodes, region, region, pricingModel);
-        }
-        
-        return {
-            services: serviceCost,
-            vpc: vpcCost,
-            dataTransfer: transferCost,
-            total: serviceCost.totalMonthly + vpcCost.total + transferCost.total,
-            totalYearly: (serviceCost.totalMonthly + vpcCost.total + transferCost.total) * 12,
-            hasServices: nodes.length > 0
-        };
-    }, [nodes, edges, region, pricingModel, vpcConfig, includeVPC, includeDataTransfer, dataTransferVersion]);
+    // Calculate percentages for breakdown
+    const totalCost = total || 0;
+    const servicesPercent = totalCost > 0 ? (services?.totalMonthly || 0) / totalCost * 100 : 0;
+    const vpcPercent = totalCost > 0 ? (vpc?.total || 0) / totalCost * 100 : 0;
+    const transferPercent = totalCost > 0 ? (dataTransfer?.total || 0) / totalCost * 100 : 0;
+
+    // Top services by cost
+    const topServices = useMemo(() => {
+        if (!services?.services || services.services.length === 0) return [];
+        return [...services.services]
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5);
+    }, [services]);
+
+    // Calculate savings if on-demand pricing is available
+    const savings = services?.savings || 0;
+    const savingsPercent = services?.savingsPercentage || 0;
 
     return (
-        <div className="cost-panel">
-            <div className="cost-header">
-                <h2>💰 Cost Estimate</h2>
-                {costData.services?.perRegion && Object.keys(costData.services.perRegion).length > 1 ? (
-                    <p className="region-label">
-                        Regions: {Object.keys(costData.services.perRegion).join(', ')}
-                    </p>
-                ) : (
-                    <p className="region-label">Region: {region}</p>
-                )}
-                {pricingModel !== 'on-demand' && (
-                    <p className="pricing-model-label">
-                        {pricingModel === 'reserved-1yr' && '📊 Reserved 1 Year'}
-                        {pricingModel === 'reserved-3yr' && '📊 Reserved 3 Year'}
-                        {pricingModel === 'spot' && '⚡ Spot Instances'}
-                    </p>
+        <div className="cost-analytics">
+            {/* Summary Cards */}
+            <div className="analytics-grid-3">
+                <div className="analytics-card summary-card">
+                    <div className="card-header">
+                        <h3>Total Monthly Cost</h3>
+                        <span className="model-badge">Current</span>
+                    </div>
+                    <div className="card-value">${total.toFixed(2)}</div>
+                    <div className="card-subtext">${totalYearly.toFixed(2)} per year</div>
+                </div>
+
+                <div className="analytics-card summary-card">
+                    <div className="card-header">
+                        <h3>Services Cost</h3>
+                    </div>
+                    <div className="card-value">${services?.totalMonthly?.toFixed(2) || '0.00'}</div>
+                    <div className="card-subtext">{servicesPercent.toFixed(1)}% of total</div>
+                </div>
+
+                {savings > 0 && (
+                    <div className="analytics-card summary-card">
+                        <div className="card-header">
+                            <h3>Potential Savings</h3>
+                            <span className="save-badge">Reserved</span>
+                        </div>
+                        <div className="card-value savings-value">${savings.toFixed(2)}</div>
+                        <div className="card-subtext">{savingsPercent.toFixed(1)}% savings</div>
+                    </div>
                 )}
             </div>
 
-            {/* Tabs */}
-            <div className="cost-panel-tabs">
-                <button
-                    className={`tab-button ${activeTab === 'summary' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('summary')}
-                >
-                    Summary
-                </button>
-                <button
-                    className={`tab-button ${activeTab === 'vpc' ? 'active' : ''} ${!costData.hasServices ? 'disabled' : ''}`}
-                    onClick={() => costData.hasServices && setActiveTab('vpc')}
-                    disabled={!costData.hasServices}
-                    title={!costData.hasServices ? 'Add services to enable VPC configuration' : ''}
-                >
-                    🌐 VPC
-                </button>
-                <button
-                    className={`tab-button ${activeTab === 'analytics' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('analytics')}
-                >
-                    Analytics
-                </button>
-                <button
-                    className={`tab-button ${activeTab === 'optimization' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('optimization')}
-                >
-                    🚀 Optimization
-                </button>
+            {/* Cost Breakdown by Category */}
+            <div className="analytics-card">
+                <h3>Cost Breakdown by Category</h3>
+                <div className="breakdown-list">
+                    {services?.totalMonthly > 0 && (
+                        <div className="breakdown-item">
+                            <div className="breakdown-label">Services</div>
+                            <div className="breakdown-bar-container">
+                                <div
+                                    className="breakdown-bar"
+                                    style={{
+                                        width: `${servicesPercent}%`,
+                                        backgroundColor: '#3b82f6'
+                                    }}
+                                />
+                            </div>
+                            <div className="breakdown-stats">
+                                <span>${services.totalMonthly.toFixed(2)}</span>
+                                <span className="percentage">{servicesPercent.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {vpc?.total > 0 && (
+                        <div className="breakdown-item">
+                            <div className="breakdown-label">VPC & Networking</div>
+                            <div className="breakdown-bar-container">
+                                <div
+                                    className="breakdown-bar"
+                                    style={{
+                                        width: `${vpcPercent}%`,
+                                        backgroundColor: '#10b981'
+                                    }}
+                                />
+                            </div>
+                            <div className="breakdown-stats">
+                                <span>${vpc.total.toFixed(2)}</span>
+                                <span className="percentage">{vpcPercent.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {dataTransfer?.total > 0 && (
+                        <div className="breakdown-item">
+                            <div className="breakdown-label">Data Transfer</div>
+                            <div className="breakdown-bar-container">
+                                <div
+                                    className="breakdown-bar"
+                                    style={{
+                                        width: `${transferPercent}%`,
+                                        backgroundColor: '#8b5cf6'
+                                    }}
+                                />
+                            </div>
+                            <div className="breakdown-stats">
+                                <span>${dataTransfer.total.toFixed(2)}</span>
+                                <span className="percentage">{transferPercent.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Summary Tab */}
-            {activeTab === 'summary' && (
-                <div>
-                    <div className="cost-summary">
-                        <div className="cost-card monthly">
-                            <span className="cost-label">Monthly</span>
-                            <span className="cost-value">${costData.total.toFixed(2)}</span>
-                        </div>
-                        <div className="cost-card yearly">
-                            <span className="cost-label">Yearly</span>
-                            <span className="cost-value">${costData.totalYearly.toFixed(2)}</span>
-                        </div>
-                    </div>
-
-                    {/* Cost Breakdown by Category */}
-                    <div className="cost-category-breakdown">
-                        <h3>Cost Breakdown</h3>
-                        
-                        {/* Services */}
-                        <div className="cost-category">
-                            <div className="category-header">
-                                <span className="category-name">Services</span>
-                                <span className="category-cost">${costData.services.totalMonthly.toFixed(2)}</span>
-                            </div>
-                            {costData.services.services.length > 0 ? (
-                                <div className="category-services">
-                                    {costData.services.services.map((service) => (
-                                        <div key={service.id} className="service-item">
-                                            <span>{service.name} <span className="service-region">({service.region})</span></span>
-                                            <span>${service.total.toFixed(2)}</span>
-                                        </div>
-                                    ))}
+            {/* Top Services */}
+            {topServices.length > 0 && (
+                <div className="analytics-card">
+                    <h3>Top Services by Cost</h3>
+                    <div className="services-list">
+                        {topServices.map((service, index) => (
+                            <div key={service.id} className="service-item">
+                                <div className="service-rank">{index + 1}</div>
+                                <div className="service-info">
+                                    <div className="service-name">{service.name}</div>
+                                    <div className="service-type">
+                                        {service.serviceType.toUpperCase()} • {service.region}
+                                    </div>
                                 </div>
-                            ) : (
-                                <p className="category-empty">No services added</p>
-                            )}
-                            {costData.services?.perRegion && Object.keys(costData.services.perRegion).length > 1 && (
-                                <div className="category-breakdown" style={{ marginTop: '8px' }}>
-                                    {Object.entries(costData.services.perRegion).map(([rgn, val]) => (
-                                        <div key={rgn} className="breakdown-item">
-                                            <span>Region: {rgn}</span>
-                                            <span>${val.toFixed(2)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* VPC & Networking */}
-                        {includeVPC && costData.hasServices && costData.vpc.total > 0 && (
-                            <div className="cost-category">
-                                <div className="category-header">
-                                    <span className="category-name">🌐 VPC & Networking</span>
-                                    <span className="category-cost">${costData.vpc.total.toFixed(2)}</span>
-                                </div>
-                                <div className="category-breakdown">
-                                    {Object.entries(costData.vpc.breakdown).map(([key, value]) => (
-                                        <div key={key} className="breakdown-item">
-                                            <span>{key}</span>
-                                            <span>${value.toFixed(2)}</span>
-                                        </div>
-                                    ))}
+                                <div className="service-cost">
+                                    ${service.total.toFixed(2)}
+                                    <span className="monthly">per month</span>
                                 </div>
                             </div>
-                        )}
-
-                        {/* Data Transfer */}
-                        {includeDataTransfer && costData.dataTransfer.total > 0 && (
-                            <div className="cost-category">
-                                <div className="category-header">
-                                    <span className="category-name">📊 Data Transfer</span>
-                                    <span className="category-cost">${costData.dataTransfer.total.toFixed(2)}</span>
-                                </div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                                    ✨ Live AWS API pricing (per-region rates)
-                                </div>
-                                <div className="category-breakdown">
-                                    {Object.entries(costData.dataTransfer.breakdown).map(([key, value]) => (
-                                        <div key={key} className="breakdown-item">
-                                            <span className="transfer-route">{key}</span>
-                                            <span>${value.toFixed(2)}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="cost-footer">
-                        <p className="disclaimer">
-                            ⚠️ Estimates based on on-demand pricing. Actual costs may vary.
-                        </p>
+                        ))}
                     </div>
                 </div>
             )}
 
-            {/* VPC Configuration Tab */}
-            {activeTab === 'vpc' && (
-                <div className="vpc-tab-content">
-                    <VPCConfigPanel />
+            {/* VPC Breakdown */}
+            {vpc?.breakdown && Object.keys(vpc.breakdown).length > 0 && (
+                <div className="analytics-card">
+                    <h3>VPC & Networking Breakdown</h3>
+                    <div className="breakdown-list">
+                        {Object.entries(vpc.breakdown).map(([key, value]) => {
+                            if (value <= 0) return null;
+                            const percent = vpc.total > 0 ? (value / vpc.total) * 100 : 0;
+                            return (
+                                <div key={key} className="breakdown-item">
+                                    <div className="breakdown-label">{key}</div>
+                                    <div className="breakdown-bar-container">
+                                        <div
+                                            className="breakdown-bar"
+                                            style={{
+                                                width: `${percent}%`,
+                                                backgroundColor: '#10b981'
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="breakdown-stats">
+                                        <span>${value.toFixed(2)}</span>
+                                        <span className="percentage">{percent.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
-            {/* Analytics Tab */}
-            {activeTab === 'analytics' && (
-                <CostAnalytics costData={costData} />
+            {/* Data Transfer Breakdown */}
+            {dataTransfer?.breakdown && Object.keys(dataTransfer.breakdown).length > 0 && (
+                <div className="analytics-card">
+                    <h3>Data Transfer Breakdown</h3>
+                    <div className="breakdown-list">
+                        {Object.entries(dataTransfer.breakdown).map(([key, value]) => {
+                            if (value <= 0) return null;
+                            const percent = dataTransfer.total > 0 ? (value / dataTransfer.total) * 100 : 0;
+                            return (
+                                <div key={key} className="breakdown-item">
+                                    <div className="breakdown-label">{key}</div>
+                                    <div className="breakdown-bar-container">
+                                        <div
+                                            className="breakdown-bar"
+                                            style={{
+                                                width: `${percent}%`,
+                                                backgroundColor: '#8b5cf6'
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="breakdown-stats">
+                                        <span>${value.toFixed(2)}</span>
+                                        <span className="percentage">{percent.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             )}
 
-            {/* Optimization Tab */}
-            {activeTab === 'optimization' && (
-                <OptimizationPanel costData={costData} />
+            {/* Region Breakdown */}
+            {services?.perRegion && Object.keys(services.perRegion).length > 1 && (
+                <div className="analytics-card">
+                    <h3>Cost by Region</h3>
+                    <div className="breakdown-list">
+                        {Object.entries(services.perRegion).map(([region, cost]) => {
+                            const percent = services.totalMonthly > 0 ? (cost / services.totalMonthly) * 100 : 0;
+                            return (
+                                <div key={region} className="breakdown-item">
+                                    <div className="breakdown-label">{region}</div>
+                                    <div className="breakdown-bar-container">
+                                        <div
+                                            className="breakdown-bar"
+                                            style={{
+                                                width: `${percent}%`,
+                                                backgroundColor: '#f59e0b'
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="breakdown-stats">
+                                        <span>${cost.toFixed(2)}</span>
+                                        <span className="percentage">{percent.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Empty State */}
+            {totalCost === 0 && (
+                <div className="empty-state">
+                    <p>No services added yet</p>
+                    <p className="empty-hint">Add services to the canvas to see detailed analytics</p>
+                </div>
             )}
         </div>
     );
 };
 
-export default CostPanel;
+export default CostAnalytics;

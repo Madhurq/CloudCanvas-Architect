@@ -5,6 +5,10 @@
   flex-direction: column;
   gap: 16px;
   padding: 16px 0;
+  overflow-x: auto;
+  padding-right: 4px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* Grid Layouts */

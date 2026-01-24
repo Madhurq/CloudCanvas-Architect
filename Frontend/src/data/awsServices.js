@@ -944,5 +944,145 @@ export const serviceCategories = [
   { id: 'networking', name: 'Networking', color: '#8C4FFF' },
   { id: 'messaging', name: 'Messaging', color: '#FF4F8B' },
   { id: 'security', name: 'Security', color: '#DD344C' },
-  { id: 'analytics', name: 'Analytics', color: '#A166FF' }
+  { id: 'analytics', name: 'Analytics', color: '#A166FF' },
+  { id: 'infrastructure', name: 'Infrastructure', color: '#232F3E' }
 ];
+
+// Container/Group type definitions
+export const containerTypes = {
+  vpc: {
+    id: 'vpc',
+    name: 'VPC',
+    category: 'infrastructure',
+    color: '#232F3E',
+    icon: '🌐',
+    isContainer: true,
+    containerType: 'vpc',
+    useCase: 'Virtual Private Cloud - isolated network environment',
+    whenToUse: 'Group related services in a private network boundary',
+    defaultConfig: {
+      cidrBlock: '10.0.0.0/16',
+      name: 'My VPC',
+    },
+    configFields: [
+      { key: 'name', label: 'VPC Name', type: 'text' },
+      { key: 'cidrBlock', label: 'CIDR Block', type: 'text' },
+    ],
+    defaultSize: { width: 500, height: 350 },
+  },
+  subnet_public: {
+    id: 'subnet_public',
+    name: 'Public Subnet',
+    category: 'infrastructure',
+    color: '#10B981',
+    icon: '🌍',
+    isContainer: true,
+    containerType: 'subnet_public',
+    useCase: 'Public-facing resources with internet access',
+    whenToUse: 'ALBs, NAT Gateways, Bastion hosts',
+    defaultConfig: {
+      cidrBlock: '10.0.1.0/24',
+      name: 'Public Subnet',
+      availabilityZone: 'a',
+    },
+    configFields: [
+      { key: 'name', label: 'Subnet Name', type: 'text' },
+      { key: 'cidrBlock', label: 'CIDR Block', type: 'text' },
+      { key: 'availabilityZone', label: 'Availability Zone', type: 'select', options: ['a', 'b', 'c'] },
+    ],
+    defaultSize: { width: 400, height: 250 },
+  },
+  subnet_private: {
+    id: 'subnet_private',
+    name: 'Private Subnet',
+    category: 'infrastructure',
+    color: '#3B82F6',
+    icon: '🔒',
+    isContainer: true,
+    containerType: 'subnet_private',
+    useCase: 'Internal resources without direct internet access',
+    whenToUse: 'Databases, app servers, internal services',
+    defaultConfig: {
+      cidrBlock: '10.0.2.0/24',
+      name: 'Private Subnet',
+      availabilityZone: 'a',
+    },
+    configFields: [
+      { key: 'name', label: 'Subnet Name', type: 'text' },
+      { key: 'cidrBlock', label: 'CIDR Block', type: 'text' },
+      { key: 'availabilityZone', label: 'Availability Zone', type: 'select', options: ['a', 'b', 'c'] },
+    ],
+    defaultSize: { width: 400, height: 250 },
+  },
+  availability_zone: {
+    id: 'availability_zone',
+    name: 'Availability Zone',
+    category: 'infrastructure',
+    color: '#8B5CF6',
+    icon: '📍',
+    isContainer: true,
+    containerType: 'availability_zone',
+    useCase: 'Physical datacenter location boundary',
+    whenToUse: 'Visualize multi-AZ deployments for high availability',
+    defaultConfig: {
+      name: 'us-east-1a',
+      zone: 'a',
+    },
+    configFields: [
+      { key: 'name', label: 'AZ Name', type: 'text' },
+      { key: 'zone', label: 'Zone', type: 'select', options: ['a', 'b', 'c', 'd', 'e', 'f'] },
+    ],
+    defaultSize: { width: 450, height: 300 },
+  },
+  security_group: {
+    id: 'security_group',
+    name: 'Security Group',
+    category: 'infrastructure',
+    color: '#EF4444',
+    icon: '🛡️',
+    isContainer: true,
+    containerType: 'security_group',
+    useCase: 'Virtual firewall for controlling traffic',
+    whenToUse: 'Group services with same inbound/outbound rules',
+    defaultConfig: {
+      name: 'web-servers-sg',
+      description: 'Security group for web servers',
+    },
+    configFields: [
+      { key: 'name', label: 'SG Name', type: 'text' },
+      { key: 'description', label: 'Description', type: 'text' },
+    ],
+    defaultSize: { width: 350, height: 220 },
+  },
+  custom_group: {
+    id: 'custom_group',
+    name: 'Custom Group',
+    category: 'infrastructure',
+    color: '#64748B',
+    icon: '📦',
+    isContainer: true,
+    containerType: 'custom_group',
+    useCase: 'Logical grouping for organization',
+    whenToUse: 'Group related services visually (Frontend, Backend, Data Layer)',
+    defaultConfig: {
+      name: 'My Group',
+      description: '',
+    },
+    configFields: [
+      { key: 'name', label: 'Group Name', type: 'text' },
+      { key: 'description', label: 'Description', type: 'text' },
+    ],
+    defaultSize: { width: 400, height: 280 },
+  },
+};
+
+// Helper to check if a service type is a container
+export const isContainerType = (serviceType) => {
+  return containerTypes[serviceType]?.isContainer === true;
+};
+
+// Get container definition
+export const getContainerType = (serviceType) => {
+  return containerTypes[serviceType] || null;
+};
+
