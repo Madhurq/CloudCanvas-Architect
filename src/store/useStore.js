@@ -1,8 +1,55 @@
 import { create } from 'zustand';
-import { awsServices } from '../data/awsServices';
+import { awsServices, getConnectionDefault } from '../data/awsServices';
 
 let nodeId = 0;
 const getId = () => `node_${nodeId++}`;
+
+// History management for undo/redo
+let history = [];
+let historyIndex = -1;
+const MAX_HISTORY = 50;
+
+const pushToHistory = (state) => {
+    // Remove any redo history if we make a new change
+    history = history.slice(0, historyIndex + 1);
+    
+    // Add new state to history
+    history.push({
+        nodes: JSON.parse(JSON.stringify(state.nodes)),
+        edges: JSON.parse(JSON.stringify(state.edges))
+    });
+    
+    // Limit history size
+    if (history.length > MAX_HISTORY) {
+        history.shift();
+    } else {
+        historyIndex++;
+    }
+};
+
+const undo = (state) => {
+    if (historyIndex > 0) {
+        historyIndex--;
+        const prevState = history[historyIndex];
+        return {
+            nodes: JSON.parse(JSON.stringify(prevState.nodes)),
+            edges: JSON.parse(JSON.stringify(prevState.edges))
+        };
+    }
+    return null;
+};
+
+const redo = (state) => {
+    if (historyIndex < history.length - 1) {
+        historyIndex++;
+        const nextState = history[historyIndex];
+        return {
+            nodes: JSON.parse(JSON.stringify(nextState.nodes)),
+            edges: JSON.parse(JSON.stringify(nextState.edges))
+        };
+    }
+    return null;
+};
 
 // Load persisted state from localStorage
 const loadPersistedState = () => {
@@ -35,7 +82,7 @@ const useStore = create((set, get) => ({
     // Theme state
     theme: persisted.theme,
 
-    // Set nodes (used by React Flow)
+    // Set nodes (used by React Flow) - handles both direct values and callbacks
     setNodes: (nodesOrUpdater) => {
         if (typeof nodesOrUpdater === 'function') {
             set((state) => ({ nodes: nodesOrUpdater(state.nodes) }));
@@ -44,7 +91,7 @@ const useStore = create((set, get) => ({
         }
     },
 
-    // Set edges (used by React Flow)
+    // Set edges (used by React Flow) - handles both direct values and callbacks
     setEdges: (edgesOrUpdater) => {
         if (typeof edgesOrUpdater === 'function') {
             set((state) => ({ edges: edgesOrUpdater(state.edges) }));
@@ -140,13 +187,21 @@ const useStore = create((set, get) => ({
 
         if (!sourceNode || !targetNode) return;
 
+        // Get smart defaults based on service types
+        const defaults = getConnectionDefault(
+            sourceNode.data.serviceType,
+            targetNode.data.serviceType
+        );
+
         const newEdge = {
             id: `edge_${connection.source}_${connection.target}`,
             source: connection.source,
             target: connection.target,
-            type: 'default',
+            type: 'labeled',
             animated: true,
             data: {
+                port: defaults.port,
+                protocol: defaults.protocol,
                 sourceType: sourceNode.data.serviceType,
                 targetType: targetNode.data.serviceType,
             },
@@ -168,9 +223,25 @@ const useStore = create((set, get) => ({
         }));
     },
 
+    // Update edge data
+    updateEdgeData: (edgeId, data) => {
+        set((state) => ({
+            edges: state.edges.map((edge) =>
+                edge.id === edgeId
+                    ? { ...edge, data: { ...edge.data, ...data } }
+                    : edge
+            ),
+        }));
+    },
+
     // Select node for configuration
     selectNode: (nodeId) => {
         set({ selectedNode: nodeId, showConfigModal: nodeId !== null });
+    },
+
+    // Select edge for configuration
+    selectEdge: (edgeId) => {
+        set({ selectedEdge: edgeId });
     },
 
     // Close config modal
@@ -204,6 +275,93 @@ const useStore = create((set, get) => ({
         localStorage.setItem('aws-calc-pricing-model', pricingModel);
     },
 
+    // Export architecture
+    exportArchitecture: () => {
+        const state = get();
+        const architecture = {
+            version: '1.0',
+            timestamp: new Date().toISOString(),
+            region: state.region,
+            pricingModel: state.pricingModel,
+            nodes: state.nodes,
+            edges: state.edges,
+        };
+        return architecture;
+    },
+
+    // Import architecture
+    importArchitecture: (architecture) => {
+        if (!architecture || architecture.version !== '1.0') {
+            throw new Error('Invalid or incompatible architecture file');
+        }
+        
+        set({
+            nodes: architecture.nodes || [],
+            edges: architecture.edges || [],
+            region: architecture.region || 'us-east-1',
+            pricingModel: architecture.pricingModel || 'on-demand',
+            selectedNode: null,
+            selectedEdge: null,
+        });
+
+        // Update nodeId counter to prevent ID conflicts
+        const maxNodeId = (architecture.nodes || []).reduce((max, node) => {
+            const match = node.id.match(/node_(\d+)/);
+            return match ? Math.max(max, parseInt(match[1], 10)) : max;
+        }, -1);
+        nodeId = maxNodeId + 1;
+
+        // Persist to localStorage
+        localStorage.setItem('aws-calc-region', architecture.region || 'us-east-1');
+        localStorage.setItem('aws-calc-pricing-model', architecture.pricingModel || 'on-demand');
+    },
+
+    // Load template (similar to import but doesn't require version check)
+    loadTemplate: (nodes, edges) => {
+        // Reset nodeId for clean slate
+        nodeId = 0;
+        
+        set({
+            nodes: nodes ? nodes.map(node => ({ ...node })) : [],
+            edges: edges ? edges.map(edge => ({ ...edge })) : [],
+            selectedNode: null,
+            selectedEdge: null,
+        });
+
+        // Update nodeId counter
+        const maxNodeId = (nodes || []).reduce((max, node) => {
+            const match = node.id.match(/node_(\d+)/);
+            return match ? Math.max(max, parseInt(match[1], 10)) : max;
+        }, -1);
+        nodeId = maxNodeId + 1;
+        
+        // Push initial state to history
+        pushToHistory({ nodes: nodes || [], edges: edges || [] });
+    },
+
+    // Undo last action
+    undo: () => {
+        const state = get();
+        const prevState = undo(state);
+        if (prevState) {
+            set(prevState);
+        }
+    },
+
+    // Redo last undone action
+    redo: () => {
+        const state = get();
+        const nextState = redo(state);
+        if (nextState) {
+            set(nextState);
+        }
+    },
+
+    // Track changes for history
+    recordHistory: () => {
+        pushToHistory(get());
+    },
+
     // Toggle theme
     toggleTheme: () => {
         set((state) => {
@@ -214,40 +372,11 @@ const useStore = create((set, get) => ({
         });
     },
 
-    // Export architecture
-    exportArchitecture: () => {
-        const state = get();
-        return {
-            version: '1.0',
-            timestamp: new Date().toISOString(),
-            region: state.region,
-            pricingModel: state.pricingModel,
-            nodes: state.nodes,
-            edges: state.edges,
-        };
-    },
-
-    // Import architecture
-    importArchitecture: (architecture) => {
-        if (!architecture || architecture.version !== '1.0') {
-            throw new Error('Invalid or incompatible architecture file');
-        }
-
-        set({
-            nodes: architecture.nodes || [],
-            edges: architecture.edges || [],
-            region: architecture.region || 'us-east-1',
-            pricingModel: architecture.pricingModel || 'on-demand',
-            selectedNode: null,
-            selectedEdge: null,
-        });
-
-        // Update nodeId counter
-        const maxNodeId = (architecture.nodes || []).reduce((max, node) => {
-            const match = node.id.match(/node_(\d+)/);
-            return match ? Math.max(max, parseInt(match[1], 10)) : max;
-        }, -1);
-        nodeId = maxNodeId + 1;
+    // Set theme
+    setTheme: (theme) => {
+        localStorage.setItem('aws-calc-theme', theme);
+        document.documentElement.setAttribute('data-theme', theme);
+        set({ theme });
     },
 }));
 
