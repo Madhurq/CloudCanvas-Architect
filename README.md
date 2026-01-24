@@ -48,6 +48,7 @@ Password: demo123456
 ### Frontend (React 19)
 - 🎨 Drag-and-drop AWS service canvas
 - 📊 Real-time cost analysis dashboard
+- 🚀 **Direct AWS deployment via CloudFormation**
 - 🎯 Pre-built architecture templates
 - ⚡ Service palette with 40+ AWS services
 - 🔧 Configurable service settings
@@ -91,7 +92,8 @@ CloudCanvas-Architect/
 │   │   ├── config/             # Database & logger config
 │   │   ├── database/           # Migrations & seeds
 │   │   ├── routes/             # API endpoints
-│   │   ├── controllers/        # Business logic
+│   │   ├── controllers/        # Business logic (+ deploymentController)
+│   │   ├── services/           # CloudFormation generator 🚀 NEW
 │   │   ├── middleware/         # Auth & error handling
 │   │   ├── utils/              # Helpers
 │   │   └── server.js           # Express app
@@ -101,6 +103,7 @@ CloudCanvas-Architect/
 │
 ├── docker-compose.yml           # Orchestration (NEW)
 ├── API_DOCUMENTATION.md         # API reference (NEW)
+├── DEPLOYMENT_GUIDE.md          # AWS deployment guide 🚀 NEW
 ├── PHASE_1_SUMMARY.md          # Implementation summary (NEW)
 ├── PHASE_1_COMPLETE.md         # Setup guide (NEW)
 ├── FRONTEND_INTEGRATION.md     # How to connect frontend (NEW)
@@ -129,13 +132,86 @@ PUT    /api/architectures/:id    # Update design
 DELETE /api/architectures/:id    # Delete design
 ```
 
+### Deployments (6 endpoints) 🚀 NEW
+```
+POST   /api/deployments                      # Deploy to AWS
+GET    /api/deployments/:id                  # Get deployment details
+GET    /api/deployments/:id/status           # Check deployment status
+GET    /api/deployments/preview/:archId      # Preview CloudFormation template
+GET    /api/deployments/architecture/:archId # Get deployment history
+DELETE /api/deployments/:id                  # Delete deployment record
+```
+
 ### Pricing (2 endpoints)
 ```
 GET    /api/pricing              # Get pricing data
 POST   /api/pricing/sync         # Sync AWS pricing
 ```
 
-**Full API documentation**: [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)
+**Full API documentation**: [API_DOCUMENTATION.md](./API_DOCUMENTATION.md)  
+**Deployment guide**: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+
+---
+
+## 🚀 AWS Deployment Feature
+
+Deploy your architecture designs directly to AWS with one click!
+
+### Key Features
+- ✅ **One-Click Deployment** - Deploy to AWS via CloudFormation
+- ✅ **Template Generation** - Automatic CloudFormation template creation
+- ✅ **Real-Time Status** - Monitor deployment progress
+- ✅ **Deployment History** - Track all your deployments
+- ✅ **Template Preview** - Download and review before deploying
+- ✅ **15+ AWS Services** - EC2, RDS, Lambda, S3, DynamoDB, and more
+
+### How It Works
+
+1. **Design** your architecture on the canvas
+2. **Configure** AWS services (instance types, regions, etc.)
+3. **Click** "🚀 Deploy to AWS" button
+4. **Enter** your AWS credentials
+5. **Deploy** or download CloudFormation template
+6. **Monitor** deployment status in real-time
+
+### Supported Services
+```
+Compute:    EC2, Lambda, ECS, EKS
+Storage:    S3
+Database:   RDS, DynamoDB, ElastiCache
+Network:    VPC, ALB, CloudFront, API Gateway
+Messaging:  SQS, SNS
+```
+
+### Quick Example
+```bash
+# 1. Design a simple web app
+- Add EC2 instance (t2.micro)
+- Add RDS MySQL database (db.t3.micro)
+- Add S3 bucket
+- Add ALB
+
+# 2. Deploy
+- Click "Deploy to AWS"
+- Enter AWS Access Key and Secret Key
+- Select region (e.g., us-east-1)
+- Click "Deploy Now"
+
+# 3. Monitor
+- Watch status change: Creating → Complete
+- View CloudFormation Stack ID
+- Check deployment history
+```
+
+### Security Best Practices
+⚠️ **Important**:
+- Use temporary AWS credentials or dedicated IAM user
+- Never commit credentials to version control
+- Review CloudFormation templates before deploying
+- Grant minimal IAM permissions required
+
+### Learn More
+📖 **Complete Guide**: [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 
 ---
 
@@ -147,6 +223,7 @@ POST   /api/pricing/sync         # Sync AWS pricing
 |-------|---------|-----------|
 | **users** | User authentication | id, email, password_hash, organization, role |
 | **architectures** | AWS architecture designs | id, user_id, name, nodes, edges, region, pricing_model |
+| **deployments** 🚀 | AWS deployment tracking | id, architecture_id, cloudformation_stack_id, status, aws_region |
 | **architecture_versions** | Change history | id, architecture_id, version_number, nodes, edges |
 | **pricing_cache** | AWS pricing data | id, service_id, region, pricing_data, expires_at |
 | **audit_logs** | Compliance tracking | id, user_id, action, entity_type, changes, created_at |
@@ -297,9 +374,13 @@ cd Backend && npm test
 - ✅ Docker orchestration
 - ✅ API documentation
 
-### Phase 2 (In Progress)
-- 🔄 Frontend-backend integration
-- 🔄 Real AWS Pricing API
+### Phase 2 ✅ COMPLETE
+- ✅ Frontend-backend integration
+- ✅ **AWS Deployment via CloudFormation**
+- ✅ CloudFormation template generation
+- ✅ Deployment history tracking
+- ✅ Real-time deployment status
+- 🔄 Real AWS Pricing API (partial)
 - 🔄 Token refresh workflows
 - 🔄 Architecture versioning UI
 
@@ -460,10 +541,11 @@ Q4 2026: Phase 7 Scalability
 
 ## 📊 Statistics
 
-- **Total Files**: 25+
-- **Lines of Code**: 2,500+
-- **API Endpoints**: 11
+- **Total Files**: 30+
+- **Lines of Code**: 3,500+
+- **API Endpoints**: 17
 - **Database Tables**: 7
+- **AWS Services Supported**: 15+
 - **Security Features**: 8+
 - **Test Coverage**: Ready for expansion
 

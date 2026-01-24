@@ -1,10 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { awsServices, getConnectionDefault } from '../data/awsServices';
 
-export const generateArchitecture = async (userPrompt, apiKey) => {
-  if (!apiKey) throw new Error("API Key is required for AI generation");
+export const generateArchitecture = async (userPrompt) => {
 
-  const ai = new GoogleGenAI({ apiKey: apiKey });
+  const ai = new GoogleGenAI({ apiKey: "AIzaSyDp_6w_JgOfNqilVBzfEr-3mnOoYTGPWwQ" });
 
   // 1. Build the "Menu" of valid services
   // We keep it lean to save tokens

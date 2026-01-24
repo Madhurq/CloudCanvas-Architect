@@ -18,6 +18,59 @@ CREATE TABLE IF NOT EXISTS users (
   last_login TIMESTAMP,
   CONSTRAINT email_or_provider CHECK (email IS NOT NULL OR provider_id IS NOT NULL)
 );
+
+-- Audit logs table
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  action VARCHAR(100) NOT NULL,
+  entity_type VARCHAR(100) NOT NULL,
+  entity_id INTEGER,
+  changes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Architectures table
+CREATE TABLE IF NOT EXISTS architectures (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  nodes TEXT NOT NULL,
+  edges TEXT NOT NULL,
+  region VARCHAR(100) NOT NULL,
+  pricing_model VARCHAR(100) NOT NULL,
+  estimated_monthly_cost NUMERIC(12,2),
+  is_public BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Pricing cache table
+CREATE TABLE IF NOT EXISTS pricing_cache (
+  service_id VARCHAR(100) NOT NULL,
+  region VARCHAR(100) NOT NULL,
+  pricing_data TEXT NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (service_id, region)
+);
+
+-- Deployments table
+CREATE TABLE IF NOT EXISTS deployments (
+  id SERIAL PRIMARY KEY,
+  architecture_id INTEGER REFERENCES architectures(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  aws_region VARCHAR(100) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  cloudformation_stack_id VARCHAR(500),
+  cloudformation_template TEXT NOT NULL,
+  error_message TEXT,
+  estimated_cost NUMERIC(12,2),
+  deployed_resources TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP
+);
 `;
 
 // Alterations for existing installations
@@ -28,6 +81,15 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS provider_id VARCHAR(255) UNIQUE;
 
 -- Make password_hash nullable for Firebase users
 ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+-- Add missing columns to architectures if needed
+ALTER TABLE architectures ADD COLUMN IF NOT EXISTS estimated_monthly_cost NUMERIC(12,2);
+ALTER TABLE architectures ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;
+ALTER TABLE architectures ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- Add deployment columns if needed
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC(12,2);
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS deployed_resources TEXT;
 `;
 
 async function migrate() {
