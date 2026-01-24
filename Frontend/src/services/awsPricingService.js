@@ -10,6 +10,7 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in ms
 
 // AWS Price List API base URL (public, no auth required!)
 const AWS_PRICING_BASE = 'https://pricing.us-east-1.amazonaws.com';
+const API_BASE = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
 
 // Service offer codes
 const SERVICE_CODES = {
@@ -213,6 +214,35 @@ const getCachedOrFetch = async (key, fetchFn) => {
     }
 };
 
+const fetchBackendPricing = async (region) => {
+    if (!API_BASE) return null;
+    const params = new URLSearchParams();
+    if (region) params.append('region', region);
+    const url = `${API_BASE}/api/pricing${params.toString() ? `?${params}` : ''}`;
+
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Backend pricing HTTP ${response.status}`);
+    const payload = await response.json();
+
+    const entries = payload?.data?.pricing;
+    if (!Array.isArray(entries)) return null;
+
+    const pricing = entries.reduce((acc, entry) => {
+        if (entry?.serviceId && entry?.pricing) {
+            acc[entry.serviceId] = entry.pricing;
+        }
+        return acc;
+    }, {});
+
+    if (Object.keys(pricing).length === 0) return null;
+
+    return {
+        ...pricing,
+        source: 'backend',
+        lastUpdated: new Date().toISOString()
+    };
+};
+
 /**
  * Fetch the index of all AWS service offers
  */
@@ -344,6 +374,20 @@ export const initializePricing = async (region = 'us-east-1') => {
     };
 
     try {
+        // Prefer backend pricing cache when available
+        const backendPricing = await fetchBackendPricing(region);
+        if (backendPricing) {
+            const mergedPricing = {
+                ...results,
+                ...backendPricing,
+                source: 'backend',
+                lastUpdated: backendPricing.lastUpdated || new Date().toISOString()
+            };
+            priceCache.set('currentPricing', { data: mergedPricing, timestamp: Date.now() });
+            console.log('Pricing initialized (source: backend)');
+            return mergedPricing;
+        }
+
         // Try to fetch EC2 pricing (most commonly used)
         const ec2Data = await fetchServicePricing('AmazonEC2', region);
         if (ec2Data) {

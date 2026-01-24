@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { awsServices, getConnectionDefault } from '../data/awsServices';
+import apiClient from '../services/apiClient';
 
 let nodeId = 0;
 const getId = () => `node_${nodeId++}`;
@@ -69,6 +70,17 @@ const useStore = create((set, get) => ({
     // React Flow state
     nodes: [],
     edges: [],
+
+    // Backend data
+    architectures: [],
+    selectedArchitecture: null,
+
+    // Auth state
+    user: null,
+    accessToken: localStorage.getItem('accessToken'),
+    refreshToken: localStorage.getItem('refreshToken'),
+    isAuthLoading: false,
+    authError: null,
 
     // UI state
     selectedNode: null,
@@ -388,6 +400,153 @@ const useStore = create((set, get) => ({
     // Track changes for history
     recordHistory: () => {
         pushToHistory(get());
+    },
+
+    // Session bootstrap
+    initializeSession: async () => {
+        const accessToken = localStorage.getItem('accessToken');
+        const refreshToken = localStorage.getItem('refreshToken');
+
+        if (!accessToken && !refreshToken) return;
+
+        set({ isAuthLoading: true, authError: null });
+        apiClient.setTokens(accessToken, refreshToken);
+
+        try {
+            const profile = await apiClient.getProfile();
+            set({
+                user: profile?.data?.user || null,
+                accessToken: apiClient.accessToken,
+                refreshToken: apiClient.refreshToken,
+            });
+            await get().loadArchitectures();
+        } catch (error) {
+            apiClient.clearTokens();
+            set({ user: null, accessToken: null, refreshToken: null, authError: error.message });
+        } finally {
+            set({ isAuthLoading: false });
+        }
+    },
+
+    // Auth flows
+    register: async (email, password, firstName, lastName, organization) => {
+        set({ isAuthLoading: true, authError: null });
+        try {
+            const response = await apiClient.register(email, password, firstName, lastName, organization);
+            const { accessToken, refreshToken, user } = response?.data || {};
+            apiClient.setTokens(accessToken, refreshToken);
+            set({
+                user: user || null,
+                accessToken,
+                refreshToken,
+            });
+            await get().loadArchitectures();
+            return user;
+        } catch (error) {
+            set({ authError: error.message });
+            throw error;
+        } finally {
+            set({ isAuthLoading: false });
+        }
+    },
+
+    login: async (email, password) => {
+        set({ isAuthLoading: true, authError: null });
+        try {
+            const response = await apiClient.login(email, password);
+            const { accessToken, refreshToken, user } = response?.data || {};
+            apiClient.setTokens(accessToken, refreshToken);
+            set({
+                user: user || null,
+                accessToken,
+                refreshToken,
+            });
+            await get().loadArchitectures();
+            return user;
+        } catch (error) {
+            set({ authError: error.message });
+            throw error;
+        } finally {
+            set({ isAuthLoading: false });
+        }
+    },
+
+    logout: async () => {
+        apiClient.clearTokens();
+        set({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            architectures: [],
+            selectedArchitecture: null,
+        });
+    },
+
+    // Architecture persistence
+    loadArchitectures: async () => {
+        try {
+            const response = await apiClient.getArchitectures();
+            set({ architectures: response?.data?.architectures || [] });
+        } catch (error) {
+            console.warn('Failed to load architectures:', error.message);
+            set({ architectures: [] });
+        }
+    },
+
+    selectArchitecture: async (architectureId) => {
+        if (!architectureId) return;
+        try {
+            const response = await apiClient.getArchitecture(architectureId);
+            const architecture = response?.data?.architecture;
+            if (!architecture) return;
+
+            set({
+                selectedArchitecture: architecture,
+                region: architecture.region || get().region,
+                pricingModel: architecture.pricing_model || architecture.pricingModel || get().pricingModel,
+                nodes: architecture.nodes || [],
+                edges: architecture.edges || [],
+            });
+        } catch (error) {
+            console.warn('Failed to select architecture:', error.message);
+        }
+    },
+
+    saveArchitecture: async (overrides = {}) => {
+        const state = get();
+        const architecturePayload = {
+            name: overrides.name || state.selectedArchitecture?.name || 'Untitled Architecture',
+            description: overrides.description || state.selectedArchitecture?.description || '',
+            nodes: state.nodes,
+            edges: state.edges,
+            region: state.region,
+            pricingModel: state.pricingModel,
+        };
+
+        try {
+            const response = state.selectedArchitecture?.id
+                ? await apiClient.updateArchitecture(state.selectedArchitecture.id, architecturePayload)
+                : await apiClient.createArchitecture(architecturePayload);
+
+            const architecture = response?.data?.architecture || null;
+            set({ selectedArchitecture: architecture });
+            await get().loadArchitectures();
+            return architecture;
+        } catch (error) {
+            console.warn('Failed to save architecture:', error.message);
+            throw error;
+        }
+    },
+
+    deleteArchitecture: async (architectureId) => {
+        if (!architectureId) return;
+        try {
+            await apiClient.deleteArchitecture(architectureId);
+            set({ selectedArchitecture: null });
+            await get().loadArchitectures();
+        } catch (error) {
+            console.warn('Failed to delete architecture:', error.message);
+        }
     },
 
     // Toggle theme
