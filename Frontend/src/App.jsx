@@ -6,6 +6,7 @@ import DesignCanvas from './components/DesignCanvas';
 import CostPanel from './components/CostPanel';
 import ConfigModal from './components/ConfigModal';
 import TemplateGallery from './components/TemplateGallery';
+import DeploymentPanel from './components/DeploymentPanel';
 import useStore from './store/useStore';
 import { initializePricing, getPricingMeta } from './services/awsPricingService';
 import { downloadArchitecture, loadArchitectureFromFile, decodeArchitectureFromUrl, getShareableUrl } from './utils/exportHelper';
@@ -45,12 +46,14 @@ function App() {
     theme,
     initializeSession,
     logout: storeLogout,
+    selectedArchitecture,
   } = useStore();
   const { user, logout: authLogout } = useAuth();
   const navigate = useNavigate();
   const [pricingStatus, setPricingStatus] = useState({ loading: true, source: null });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
@@ -263,7 +266,10 @@ function App() {
         </div>
 
         <div className="header-right">
-        <button className="btn btn-primary" onClick={() => setShowAIModal(true)} title="Generate with AI">
+        <button className="btn btn-primary" onClick={() => setShowDeployModal(true)} title="Deploy to AWS">
+            🚀 Deploy to AWS
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowAIModal(true)} title="Generate with AI">
             ✨ AI Design
           </button>
           <button className="btn btn-ghost" onClick={() => setShowTemplates(true)} title="Load Template (Ctrl+K)">
@@ -321,6 +327,10 @@ function App() {
       {showConfigModal && <ConfigModal />}
       <TemplateGallery isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
       <AIGeneratorModal isOpen={showAIModal} onClose={() => setShowAIModal(false)} />
+      <DeploymentPanel
+        isOpen={showDeployModal}
+        onClose={() => setShowDeployModal(false)}
+      />
       {/* Share Modal */}
       {showShareModal && (
         <div className="modal-overlay" onClick={() => setShowShareModal(false)}>

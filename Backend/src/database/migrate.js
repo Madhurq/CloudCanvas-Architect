@@ -54,6 +54,23 @@ CREATE TABLE IF NOT EXISTS pricing_cache (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (service_id, region)
 );
+
+-- Deployments table
+CREATE TABLE IF NOT EXISTS deployments (
+  id SERIAL PRIMARY KEY,
+  architecture_id INTEGER REFERENCES architectures(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  aws_region VARCHAR(100) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  cloudformation_stack_id VARCHAR(500),
+  cloudformation_template TEXT NOT NULL,
+  error_message TEXT,
+  estimated_cost NUMERIC(12,2),
+  deployed_resources TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP
+);
 `;
 
 // Alterations for existing installations
@@ -69,6 +86,10 @@ ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 ALTER TABLE architectures ADD COLUMN IF NOT EXISTS estimated_monthly_cost NUMERIC(12,2);
 ALTER TABLE architectures ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;
 ALTER TABLE architectures ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- Add deployment columns if needed
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC(12,2);
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS deployed_resources TEXT;
 `;
 
 async function migrate() {
