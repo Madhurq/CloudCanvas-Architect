@@ -11,11 +11,6 @@ const ServicePalette = () => {
         event.dataTransfer.effectAllowed = 'move';
     };
 
-    const categoryList = Object.entries(serviceCategories).map(([id, cat]) => ({
-        id,
-        ...cat
-    }));
-
     const filteredServices = Object.values(awsServices).filter((service) => {
         if (!searchQuery) return service.category === activeCategory;
         const query = searchQuery.toLowerCase();
@@ -42,7 +37,7 @@ const ServicePalette = () => {
             {/* Category Tabs */}
             {!searchQuery && (
                 <div className="category-tabs">
-                    {categoryList.map((category) => (
+                    {serviceCategories.map((category) => (
                         <button
                             key={category.id}
                             className={`category-tab ${activeCategory === category.id ? 'active' : ''}`}

@@ -2,6 +2,8 @@ import { memo } from 'react';
 import { Handle, Position } from '@xyflow/react';
 
 const AWSServiceNode = ({ data, selected }) => {
+    const regionShortName = data.region ? data.region.split('-')[0] : 'us';
+    
     return (
         <div
             className={`aws-node ${selected ? 'selected' : ''}`}
@@ -15,6 +17,15 @@ const AWSServiceNode = ({ data, selected }) => {
             <div className="node-header" style={{ backgroundColor: data.color }}>
                 <span className="node-icon">{data.icon}</span>
                 <span className="node-label">{data.label}</span>
+                {data.region && (
+                    <span 
+                        className="node-region-badge" 
+                        data-region={data.region}
+                        title={`Region: ${data.region}`}
+                    >
+                        {regionShortName}
+                    </span>
+                )}
             </div>
 
             <div className="node-body">

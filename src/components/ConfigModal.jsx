@@ -2,9 +2,24 @@ import { useState, useEffect } from 'react';
 import useStore from '../store/useStore';
 import { awsServices } from '../data/awsServices';
 
+const AWS_REGIONS = [
+    { value: 'us-east-1', label: 'US East (N. Virginia)' },
+    { value: 'us-east-2', label: 'US East (Ohio)' },
+    { value: 'us-west-1', label: 'US West (N. California)' },
+    { value: 'us-west-2', label: 'US West (Oregon)' },
+    { value: 'eu-west-1', label: 'Europe (Ireland)' },
+    { value: 'eu-west-2', label: 'Europe (London)' },
+    { value: 'eu-central-1', label: 'Europe (Frankfurt)' },
+    { value: 'ap-south-1', label: 'Asia Pacific (Mumbai)' },
+    { value: 'ap-southeast-1', label: 'Asia Pacific (Singapore)' },
+    { value: 'ap-southeast-2', label: 'Asia Pacific (Sydney)' },
+    { value: 'ap-northeast-1', label: 'Asia Pacific (Tokyo)' },
+];
+
 const ConfigModal = () => {
-    const { nodes, selectedNode, closeConfigModal, updateNodeConfig } = useStore();
+    const { nodes, selectedNode, closeConfigModal, updateNodeConfig, updateNodeRegion } = useStore();
     const [localConfig, setLocalConfig] = useState({});
+    const [localRegion, setLocalRegion] = useState('us-east-1');
 
     const node = nodes.find((n) => n.id === selectedNode);
     const serviceType = node?.data?.serviceType;
@@ -13,6 +28,9 @@ const ConfigModal = () => {
     useEffect(() => {
         if (node?.data?.config) {
             setLocalConfig({ ...node.data.config });
+        }
+        if (node?.data?.region) {
+            setLocalRegion(node.data.region);
         }
     }, [node]);
 
@@ -30,6 +48,7 @@ const ConfigModal = () => {
 
     const handleSave = () => {
         updateNodeConfig(selectedNode, localConfig);
+        updateNodeRegion(selectedNode, localRegion);
         closeConfigModal();
     };
 
@@ -47,6 +66,26 @@ const ConfigModal = () => {
                 </div>
 
                 <div className="modal-body">
+                    {/* Region Selector */}
+                    <div className="config-field region-selector">
+                        <label htmlFor="node-region">🌍 Region</label>
+                        <select
+                            id="node-region"
+                            value={localRegion}
+                            onChange={(e) => setLocalRegion(e.target.value)}
+                            className="region-select"
+                        >
+                            {AWS_REGIONS.map((region) => (
+                                <option key={region.value} value={region.value}>
+                                    {region.label}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="hint">Region affects pricing and data transfer costs</p>
+                    </div>
+
+                    <div className="config-divider"></div>
+
                     {service.configFields.map((field) => (
                         <div key={field.key} className="config-field">
                             <label htmlFor={field.key}>{field.label}</label>
