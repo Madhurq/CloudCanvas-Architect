@@ -216,7 +216,7 @@ function App() {
     <div className="app">
       <header className="app-header">
         <div className="header-left">
-          <h1>☁️ AWS Architecture Cost Calculator</h1>
+          <h1>☁️</h1>
           {pricingStatus.source && (
             <span className={`badge ${pricingStatus.source === 'aws-api' ? 'badge-success' : 'badge-warning'}`}>
               {pricingStatus.source === 'aws-api' ? '✓ Live Prices' : '⚠ Cached Prices'}
@@ -352,16 +352,8 @@ function App() {
       )}
 
       <footer className="app-footer">
-        <p>Drag AWS services • Connect them • Get instant cost estimates</p>
-        <p className="footer-note">
-          {pricingStatus.loading
-            ? 'Loading pricing data...'
-            : pricingStatus.source === 'aws-api'
-              ? `Prices from AWS Price List API (${region} on-demand rates)`
-              : `Using cached prices (${region} on-demand rates)`}
-        </p>
         <p className="keyboard-shortcuts">
-          Shortcuts: <kbd>Delete</kbd> remove • <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo •
+          <kbd>Delete</kbd> remove • <kbd>Ctrl+Z</kbd>/<kbd>Ctrl+Y</kbd> undo/redo •
           <kbd>Ctrl+E</kbd> export • <kbd>Ctrl+K</kbd> templates • <kbd>Ctrl+Shift+C</kbd> clear
         </p>
       </footer>
