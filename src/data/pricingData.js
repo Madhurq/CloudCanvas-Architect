@@ -35,6 +35,13 @@ export const S3_REQUEST_PRICES = {
     GET: 0.0004  // per 1000 requests
 };
 
+export const FARGATE_PRICES = {
+    'us-east-1': {
+        vCPU: 0.04048,    // per vCPU-hour
+        memory: 0.004445  // per GB-hour
+    }
+};
+
 export const RDS_PRICES = {
     'us-east-1': {
         'db.t3.micro': { postgres: 0.018, mysql: 0.017, mariadb: 0.017 },
@@ -58,11 +65,28 @@ export const ALB_PRICES = {
     }
 };
 
-export const LAMBDA_PRICES = {
+export const CLOUDFRONT_PRICES = {
     'us-east-1': {
-        requestPrice: 0.0000002, // per request
-        gbSecondPrice: 0.0000166667 // per GB-second
+        dataTransferFirst10TB: 0.085,
+        dataTransfer10to50TB: 0.08,
+        httpRequests: 0.0075,  // per 10,000
+        httpsRequests: 0.01    // per 10,000
     }
+};
+
+export const ELASTICACHE_PRICES = {
+    'us-east-1': {
+        'cache.t3.micro': 0.017,
+        'cache.t3.small': 0.034,
+        'cache.t3.medium': 0.068,
+        'cache.r5.large': 0.228
+    }
+};
+
+export const WAF_PRICES = {
+    webACL: 5.00,      // per month
+    rule: 1.00,        // per month per rule
+    requests: 0.60     // per million requests
 };
 
 export const DATA_TRANSFER_PRICES = {
