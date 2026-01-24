@@ -173,7 +173,6 @@ function App() {
       <header className="app-header">
         <div className="header-left">
           <h1>☁️ AWS Architecture Cost Calculator</h1>
-          <span className="badge">Demo</span>
           {pricingStatus.source && (
             <span className={`badge ${pricingStatus.source === 'aws-api' ? 'badge-success' : 'badge-warning'}`}>
               {pricingStatus.source === 'aws-api' ? '✓ Live Prices' : '⚠ Cached Prices'}
