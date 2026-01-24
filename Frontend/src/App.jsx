@@ -28,13 +28,9 @@ const PRICING_MODELS = [
 ];
 
 function App() {
-<<<<<<< HEAD
-  const { showConfigModal, clearCanvas, region, setRegion, pricingModel, setPricingModel, exportArchitecture, importArchitecture, deleteSelected, undo, redo, toggleTheme, theme, initializeSession } = useStore();
-=======
   const { showConfigModal, clearCanvas, region, setRegion, pricingModel, setPricingModel, exportArchitecture, importArchitecture, deleteSelected, undo, redo, toggleTheme, theme } = useStore();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
->>>>>>> 46d7a9f5cd231f90da00d6480aa48dfde66fff4c
   const [pricingStatus, setPricingStatus] = useState({ loading: true, source: null });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -42,12 +38,6 @@ function App() {
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
   const fileInputRef = useRef(null);
 
-<<<<<<< HEAD
-  // Bootstrap session when tokens are present
-  useEffect(() => {
-    initializeSession();
-  }, [initializeSession]);
-=======
   const handleLogout = async () => {
     try {
       await logout();
@@ -56,7 +46,6 @@ function App() {
       console.error('Logout failed:', error);
     }
   };
->>>>>>> 46d7a9f5cd231f90da00d6480aa48dfde66fff4c
 
   // Initialize AWS pricing on app startup
   useEffect(() => {
