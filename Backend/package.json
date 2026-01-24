@@ -1,0 +1,41 @@
+{
+  "name": "cloudcanvas-architect-backend",
+  "version": "1.0.0",
+  "description": "Enterprise backend for CloudCanvas-Architect AWS architecture design tool",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node src/database/migrate.js",
+    "seed": "node src/database/seed.js",
+    "lint": "eslint .",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage"
+  },
+  "keywords": [
+    "aws",
+    "architecture",
+    "design",
+    "cost-calculator"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.11.3",
+    "pino": "^8.17.2",
+    "pino-http": "^8.6.1",
+    "postgres": "^3.4.8"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.1.5",
+    "eslint": "^8.54.0",
+    "vitest": "^1.1.0"
+  }
+}
