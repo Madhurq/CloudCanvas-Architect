@@ -6,7 +6,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const generateArchitecture = async (userPrompt) => {
 
-  const ai = new GoogleGenAI({ apiKey: "AIzaSyAFPxSYFoCsbcyMShZQM17w9RZK5yKg4AM" }); // put This API in .env 
+  const ai = new GoogleGenAI({ apiKey: process.env.AI_API_KEY }); // put This API in .env 
 
   // 1. Build Strict Menu (IDs only to save bandwidth)
   const validServicesList = Object.values(awsServices).map(s => `"${s.id}"`).join(', ');
