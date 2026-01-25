@@ -14,6 +14,7 @@ export const generateCloudFormationTemplate = (nodes, edges, architectureName, r
   const parameters = {};
   const mappings = {};
   const nodeMap = {}; // Track node IDs to resource logical IDs
+  const nodesById = Object.fromEntries((nodes || []).map((n) => [n.id, n]));
 
   // Find VPC node to get region (VPC is the source of truth for region)
   const vpcNode = nodes.find(node => node.data?.serviceType === 'vpc');
@@ -43,12 +44,18 @@ export const generateCloudFormationTemplate = (nodes, edges, architectureName, r
     !['vpc', 'subnet_public', 'subnet_private', 'security_group'].includes(node.data?.serviceType)
   );
 
+  // Precompute logical IDs for all nodes so cross-references work reliably
+  nodes.forEach((node) => {
+    const serviceType = node?.data?.serviceType;
+    if (!serviceType || !node?.id) return;
+    nodeMap[node.id] = sanitizeLogicalId(`${serviceType}${node.id.replace('node_', '')}`);
+  });
+
   // Process infrastructure nodes first (VPC, subnets, security groups)
   infrastructureNodes.forEach((node) => {
     const { data } = node;
     const serviceType = data.serviceType;
-    const logicalId = sanitizeLogicalId(`${serviceType}${node.id.replace('node_', '')}`);
-    nodeMap[node.id] = logicalId;
+    const logicalId = nodeMap[node.id];
 
     try {
       const generator = serviceGenerators[serviceType];
@@ -71,8 +78,7 @@ export const generateCloudFormationTemplate = (nodes, edges, architectureName, r
   serviceNodes.forEach((node) => {
     const { data } = node;
     const serviceType = data.serviceType;
-    const logicalId = sanitizeLogicalId(`${serviceType}${node.id.replace('node_', '')}`);
-    nodeMap[node.id] = logicalId;
+    const logicalId = nodeMap[node.id];
 
     try {
       const generator = serviceGenerators[serviceType];
@@ -81,6 +87,9 @@ export const generateCloudFormationTemplate = (nodes, edges, architectureName, r
         const context = {
           vpcId: vpcLogicalId ? { Ref: vpcLogicalId } : undefined,
           securityGroupId: securityGroupLogicalId ? { 'Fn::GetAtt': [securityGroupLogicalId, 'GroupId'] } : undefined,
+          nodeId: node.id,
+          nodesById,
+          edges,
         };
         resources[logicalId] = generator(data, logicalId, nodeMap, deploymentRegion, context);
       } else {
@@ -588,21 +597,113 @@ const serviceGenerators = {
     },
   }),
 
-  cloudfront: (data, logicalId) => {
-    // CloudFront requires at least one origin - provide default if none configured
-    const origins = data.config?.origins && data.config.origins.length > 0
-      ? data.config.origins
-      : [
-          {
-            Id: `${logicalId}Origin`,
-            DomainName: data.config?.domainName || `${logicalId.toLowerCase()}.s3.amazonaws.com`,
-            S3OriginConfig: data.config?.isS3Origin !== false ? {} : undefined,
-            CustomOriginConfig: data.config?.isS3Origin === false ? {
-              OriginProtocolPolicy: 'https-only',
-              OriginSSLProtocols: ['TLSv1.2'],
-            } : undefined,
+  cloudfront: (data, logicalId, nodeMap, region, context = {}) => {
+    // CloudFront requires DistributionConfig.Origins with Items (>=1) + Quantity
+    const mkCustomOrigin = (originId, domainName) => ({
+      Id: originId,
+      DomainName: domainName,
+      CustomOriginConfig: {
+        OriginProtocolPolicy: 'https-only',
+        OriginSSLProtocols: ['TLSv1.2'],
+      },
+    });
+
+    const mkS3Origin = (originId, domainName) => ({
+      Id: originId,
+      DomainName: domainName,
+      S3OriginConfig: {},
+    });
+
+    const normalizeConfiguredOrigins = (configured) => {
+      if (!Array.isArray(configured)) return [];
+      return configured
+        .map((o, idx) => {
+          if (!o) return null;
+          const originId = o.Id || o.id || `${logicalId}Origin${idx + 1}`;
+          const domainName = o.DomainName || o.domainName;
+          if (!domainName) return null;
+
+          // If caller specifies configs, keep them; otherwise default to custom origin
+          const hasS3 = o.S3OriginConfig || o.s3OriginConfig;
+          const hasCustom = o.CustomOriginConfig || o.customOriginConfig;
+
+          if (hasS3) {
+            return {
+              Id: originId,
+              DomainName: domainName,
+              S3OriginConfig: o.S3OriginConfig || o.s3OriginConfig || {},
+            };
           }
-        ];
+
+          if (hasCustom) {
+            return {
+              Id: originId,
+              DomainName: domainName,
+              CustomOriginConfig: o.CustomOriginConfig || o.customOriginConfig,
+            };
+          }
+
+          // Default: custom origin (works for ALB/API/custom domains)
+          return mkCustomOrigin(originId, domainName);
+        })
+        .filter(Boolean);
+    };
+
+    let originItems = normalizeConfiguredOrigins(data.config?.origins);
+
+    // If not explicitly configured, try to infer from the diagram: CloudFront -> (S3 | ALB)
+    if (originItems.length === 0 && context?.nodeId && Array.isArray(context?.edges)) {
+      const connected = new Set();
+      for (const e of context.edges) {
+        if (!e) continue;
+        if (e.source === context.nodeId && e.target) connected.add(e.target);
+        if (e.target === context.nodeId && e.source) connected.add(e.source);
+      }
+
+      let i = 0;
+      for (const nodeId of connected) {
+        const node = context?.nodesById?.[nodeId];
+        const serviceType = node?.data?.serviceType;
+        const targetLogicalId = nodeMap?.[nodeId];
+        if (!serviceType || !targetLogicalId) continue;
+
+        i += 1;
+        const originId = `${logicalId}Origin${i}`;
+
+        if (serviceType === 's3') {
+          originItems.push(
+            mkS3Origin(originId, { 'Fn::GetAtt': [targetLogicalId, 'RegionalDomainName'] })
+          );
+        } else if (serviceType === 'alb') {
+          originItems.push(
+            mkCustomOrigin(originId, { 'Fn::GetAtt': [targetLogicalId, 'DNSName'] })
+          );
+        } else if (serviceType === 'apigateway') {
+          // AWS::ApiGatewayV2::Api Ref returns ApiId
+          originItems.push(
+            mkCustomOrigin(originId, {
+              'Fn::Sub': [
+                '${ApiId}.execute-api.${AWS::Region}.amazonaws.com',
+                { ApiId: { Ref: targetLogicalId } },
+              ],
+            })
+          );
+        }
+      }
+    }
+
+    // If still empty, fall back to a safe default custom origin to avoid invalid template
+    if (originItems.length === 0) {
+      const domain = data.config?.domainName || 'example.com';
+      originItems = [mkCustomOrigin(`${logicalId}Origin1`, domain)];
+    }
+
+    const origins = {
+      Quantity: originItems.length,
+      Items: originItems,
+    };
+
+    const targetOriginId = originItems[0].Id;
 
     return {
       Type: 'AWS::CloudFront::Distribution',
@@ -610,7 +711,7 @@ const serviceGenerators = {
         DistributionConfig: {
           Enabled: true,
           DefaultCacheBehavior: {
-            TargetOriginId: `${logicalId}Origin`,
+            TargetOriginId: targetOriginId,
             ViewerProtocolPolicy: 'redirect-to-https',
             AllowedMethods: ['GET', 'HEAD', 'OPTIONS'],
             CachedMethods: ['GET', 'HEAD'],

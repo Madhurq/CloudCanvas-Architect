@@ -428,8 +428,9 @@ export const previewTemplate = async (req, res) => {
       );
     }
 
-    // Generate CloudFormation template (pass region for region-specific defaults)
-    const cfnTemplate = generateCloudFormationTemplate(nodes, edges, architecture.name, 'us-east-1');
+    // Generate CloudFormation template (region defaults; VPC node overrides if present)
+    const defaultRegion = architecture.region || 'us-east-1';
+    const cfnTemplate = generateCloudFormationTemplate(nodes, edges, architecture.name, defaultRegion);
 
     res.json(
       formatResponse(true, {
