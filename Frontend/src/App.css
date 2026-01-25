@@ -1789,3 +1789,215 @@ body {
 .service-tile[style*="--service-color: #64748B"] {
   border-style: dashed;
 }
+
+/* ===== Region Badge ===== */
+.region-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ===== VPC Warning Modal ===== */
+.vpc-warning-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.vpc-warning-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 520px;
+  width: 90%;
+  overflow: hidden;
+}
+
+.vpc-warning-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.vpc-warning-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--accent-warning);
+}
+
+.vpc-warning-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.vpc-warning-header .close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.vpc-warning-body {
+  padding: 20px;
+}
+
+.vpc-warning-body p {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.vpc-steps {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.vpc-steps h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.vpc-steps ol {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+}
+
+.vpc-steps li {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.vpc-steps li:last-child {
+  margin-bottom: 0;
+}
+
+.vpc-steps .highlight {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.vpc-tip {
+  font-size: 0.9rem;
+  color: var(--accent-success);
+  background: rgba(16, 185, 129, 0.1);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent-success);
+}
+
+.vpc-warning-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ===== Canvas Empty Hint ===== */
+.canvas-empty-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.empty-hint-content {
+  text-align: center;
+  padding: 30px 40px;
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  opacity: 0.9;
+}
+
+.empty-hint-content h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.3rem;
+  color: var(--text-primary);
+}
+
+.empty-hint-content p {
+  margin: 0 0 15px 0;
+  color: var(--text-secondary);
+}
+
+.hint-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--accent-primary);
+}
+
+.hint-steps span {
+  background: rgba(59, 130, 246, 0.1);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+}
+
+/* ===== Inherited Region Display ===== */
+.inherited-region {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.region-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.inherited-badge {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-primary);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.vpc-region .region-select {
+  border: 2px solid var(--accent-primary);
+}
+
+.hint-important {
+  color: var(--accent-primary);
+  font-weight: 500;
+}
+
+.region-display {
+  opacity: 0.9;
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import useStore from '../store/useStore';
-import { awsServices } from '../data/awsServices';
+import { awsServices, containerTypes } from '../data/awsServices';
 
 const AWS_REGIONS = [
     { value: 'us-east-1', label: 'US East (N. Virginia)' },
@@ -17,22 +17,38 @@ const AWS_REGIONS = [
 ];
 
 const ConfigModal = () => {
-    const { nodes, selectedNode, closeConfigModal, updateNodeConfig, updateNodeRegion } = useStore();
+    const { nodes, selectedNode, closeConfigModal, updateNodeConfig, updateNodeRegion, setRegion, region } = useStore();
     const [localConfig, setLocalConfig] = useState({});
     const [localRegion, setLocalRegion] = useState('us-east-1');
 
     const node = nodes.find((n) => n.id === selectedNode);
     const serviceType = node?.data?.serviceType;
-    const service = serviceType ? awsServices[serviceType] : null;
+    
+    // Check if it's a container type (VPC, subnet, security group) or regular service
+    const isContainer = containerTypes && containerTypes[serviceType];
+    const service = isContainer ? containerTypes[serviceType] : awsServices[serviceType];
+    
+    // Check if this is a VPC node (controls global region)
+    const isVPC = serviceType === 'vpc';
+    
+    // Get VPC node for inheriting region
+    const vpcNode = nodes.find(n => n.data?.serviceType === 'vpc');
+    const inheritedRegion = vpcNode?.data?.region || region;
 
     useEffect(() => {
         if (node?.data?.config) {
             setLocalConfig({ ...node.data.config });
         }
-        if (node?.data?.region) {
+        if (isVPC && node?.data?.region) {
+            // VPC uses its own region
             setLocalRegion(node.data.region);
+        } else if (node?.data?.region) {
+            setLocalRegion(node.data.region);
+        } else if (vpcNode?.data?.region) {
+            // Non-VPC nodes inherit from VPC
+            setLocalRegion(vpcNode.data.region);
         }
-    }, [node]);
+    }, [node, isVPC, vpcNode]);
 
     if (!node || !service) return null;
 
@@ -49,6 +65,12 @@ const ConfigModal = () => {
     const handleSave = () => {
         updateNodeConfig(selectedNode, localConfig);
         updateNodeRegion(selectedNode, localRegion);
+        
+        // If this is a VPC, also set the global region
+        if (isVPC) {
+            setRegion(localRegion);
+        }
+        
         closeConfigModal();
     };
 
@@ -66,23 +88,38 @@ const ConfigModal = () => {
                 </div>
 
                 <div className="modal-body">
-                    {/* Region Selector */}
-                    <div className="config-field region-selector">
-                        <label htmlFor="node-region">🌍 Region</label>
-                        <select
-                            id="node-region"
-                            value={localRegion}
-                            onChange={(e) => setLocalRegion(e.target.value)}
-                            className="region-select"
-                        >
-                            {AWS_REGIONS.map((region) => (
-                                <option key={region.value} value={region.value}>
-                                    {region.label}
-                                </option>
-                            ))}
-                        </select>
-                        <p className="hint">Region affects pricing and data transfer costs</p>
-                    </div>
+                    {/* Region Selector - Only editable for VPC */}
+                    {isVPC ? (
+                        <div className="config-field region-selector vpc-region">
+                            <label htmlFor="node-region">🌍 Deployment Region</label>
+                            <select
+                                id="node-region"
+                                value={localRegion}
+                                onChange={(e) => setLocalRegion(e.target.value)}
+                                className="region-select"
+                            >
+                                {AWS_REGIONS.map((r) => (
+                                    <option key={r.value} value={r.value}>
+                                        {r.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="hint hint-important">
+                                🔒 This sets the region for ALL resources in this VPC
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="config-field region-display">
+                            <label>🌍 Region</label>
+                            <div className="inherited-region">
+                                <span className="region-value">
+                                    {AWS_REGIONS.find(r => r.value === inheritedRegion)?.label || inheritedRegion}
+                                </span>
+                                <span className="inherited-badge">Inherited from VPC</span>
+                            </div>
+                            <p className="hint">Region is set by the VPC configuration</p>
+                        </div>
+                    )}
 
                     <div className="config-divider"></div>
 

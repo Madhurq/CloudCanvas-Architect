@@ -15,6 +15,10 @@ export const generateCloudFormationTemplate = (nodes, edges, architectureName, r
   const mappings = {};
   const nodeMap = {}; // Track node IDs to resource logical IDs
 
+  // Find VPC node to get region (VPC is the source of truth for region)
+  const vpcNode = nodes.find(node => node.data?.serviceType === 'vpc');
+  const deploymentRegion = vpcNode?.data?.region || region;
+
   // Add default parameters for sensitive data
   parameters.DBPassword = {
     Type: 'String',
@@ -24,15 +28,23 @@ export const generateCloudFormationTemplate = (nodes, edges, architectureName, r
     Default: 'ChangeMe123!',
   };
 
-  // Add region parameter (optional, can be used in mappings)
+  // Add region parameter
   parameters.AWSRegion = {
     Type: 'String',
-    Default: region,
+    Default: deploymentRegion,
     Description: 'AWS region for deployment',
   };
 
-  // Process each node
-  nodes.forEach((node) => {
+  // Process VPC and infrastructure nodes first (they need to exist before other resources)
+  const infrastructureNodes = nodes.filter(node => 
+    ['vpc', 'subnet_public', 'subnet_private', 'security_group'].includes(node.data?.serviceType)
+  );
+  const serviceNodes = nodes.filter(node => 
+    !['vpc', 'subnet_public', 'subnet_private', 'security_group'].includes(node.data?.serviceType)
+  );
+
+  // Process infrastructure nodes first (VPC, subnets, security groups)
+  infrastructureNodes.forEach((node) => {
     const { data } = node;
     const serviceType = data.serviceType;
     const logicalId = sanitizeLogicalId(`${serviceType}${node.id.replace('node_', '')}`);
@@ -41,7 +53,36 @@ export const generateCloudFormationTemplate = (nodes, edges, architectureName, r
     try {
       const generator = serviceGenerators[serviceType];
       if (generator) {
-        resources[logicalId] = generator(data, logicalId, nodeMap, region);
+        resources[logicalId] = generator(data, logicalId, nodeMap, deploymentRegion);
+      } else {
+        logger.warn(`No generator for service type: ${serviceType}, skipping`);
+      }
+    } catch (error) {
+      logger.error(`Error generating resource for ${serviceType}:`, error);
+    }
+  });
+
+  // Get VPC and Security Group references for service nodes
+  const vpcLogicalId = vpcNode ? nodeMap[vpcNode.id] : null;
+  const securityGroupNode = nodes.find(node => node.data?.serviceType === 'security_group');
+  const securityGroupLogicalId = securityGroupNode ? nodeMap[securityGroupNode.id] : null;
+
+  // Process service nodes (they can reference VPC/security groups)
+  serviceNodes.forEach((node) => {
+    const { data } = node;
+    const serviceType = data.serviceType;
+    const logicalId = sanitizeLogicalId(`${serviceType}${node.id.replace('node_', '')}`);
+    nodeMap[node.id] = logicalId;
+
+    try {
+      const generator = serviceGenerators[serviceType];
+      if (generator) {
+        // Pass VPC and security group context to service generators
+        const context = {
+          vpcId: vpcLogicalId ? { Ref: vpcLogicalId } : undefined,
+          securityGroupId: securityGroupLogicalId ? { 'Fn::GetAtt': [securityGroupLogicalId, 'GroupId'] } : undefined,
+        };
+        resources[logicalId] = generator(data, logicalId, nodeMap, deploymentRegion, context);
       } else {
         logger.warn(`No generator for service type: ${serviceType}, skipping`);
       }
@@ -184,16 +225,21 @@ const generateOutputsForResource = (logicalId, resource, outputs) => {
 
 // Service generators mapped by service type
 const serviceGenerators = {
-  ec2: (data, logicalId, nodeMap, region) => {
+  // EC2 instance with VPC/security group support
+  ec2: (data, logicalId, nodeMap, region, context = {}) => {
     // Get AMI ID - uses SSM Parameter Store for latest Amazon Linux 2 (region-aware)
     const imageId = getDefaultAMI(region, data.config?.amiId);
+
+    // Use context security group if available, otherwise fall back to config
+    const securityGroupIds = data.config?.securityGroups || 
+      (context.securityGroupId ? [context.securityGroupId] : undefined);
 
     return {
       Type: 'AWS::EC2::Instance',
       Properties: {
         ImageId: imageId,
         InstanceType: data.config?.instanceType || 't2.micro',
-        SecurityGroupIds: data.config?.securityGroups || undefined,
+        SecurityGroupIds: securityGroupIds,
         SubnetId: data.config?.subnetId || undefined,
         KeyName: data.config?.keyName || undefined,
         IamInstanceProfile: data.config?.instanceProfile || undefined,
@@ -212,49 +258,61 @@ const serviceGenerators = {
     };
   },
 
-  rds: (data, logicalId) => ({
-    Type: 'AWS::RDS::DBInstance',
-    Properties: {
-      DBInstanceIdentifier: logicalId.toLowerCase().substring(0, 63),
-      Engine: data.config?.engine || 'mysql',
-      EngineVersion: data.config?.engineVersion || '8.0.35',
-      DBInstanceClass: data.config?.dbInstanceClass || 'db.t3.micro',
-      MasterUsername: data.config?.masterUsername || 'admin',
-      MasterUserPassword: { Ref: 'DBPassword' }, // From parameters
-      AllocatedStorage: String(data.config?.allocatedStorage || '20'),
-      StorageType: data.config?.storageType || 'gp3',
-      StorageEncrypted: data.config?.encrypted !== false,
-      MultiAZ: data.config?.multiAZ || false,
-      PubliclyAccessible: data.config?.publiclyAccessible || false,
-      BackupRetentionPeriod: data.config?.backupRetention || 7,
-      VPCSecurityGroups: data.config?.securityGroups || undefined,
-      DBSubnetGroupName: data.config?.dbSubnetGroup || undefined,
-      Tags: [
-        {
-          Key: 'Name',
-          Value: data.label || logicalId,
-        },
-      ],
-    },
-  }),
+  rds: (data, logicalId, nodeMap, region, context = {}) => {
+    // Use context security group if available
+    const vpcSecurityGroups = data.config?.securityGroups || 
+      (context.securityGroupId ? [context.securityGroupId] : undefined);
 
-  alb: (data, logicalId) => ({
-    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer',
-    Properties: {
-      Name: logicalId.toLowerCase().substring(0, 32),
-      Type: 'application',
-      Scheme: data.config?.scheme || 'internet-facing',
-      IpAddressType: 'ipv4',
-      SecurityGroups: data.config?.securityGroups || undefined,
-      Subnets: data.config?.subnets || undefined,
-      Tags: [
-        {
-          Key: 'Name',
-          Value: data.label || logicalId,
-        },
-      ],
-    },
-  }),
+    return {
+      Type: 'AWS::RDS::DBInstance',
+      Properties: {
+        DBInstanceIdentifier: logicalId.toLowerCase().substring(0, 63),
+        Engine: data.config?.engine || 'mysql',
+        EngineVersion: data.config?.engineVersion || '8.0.35',
+        DBInstanceClass: data.config?.dbInstanceClass || 'db.t3.micro',
+        MasterUsername: data.config?.masterUsername || 'admin',
+        MasterUserPassword: { Ref: 'DBPassword' }, // From parameters
+        AllocatedStorage: String(data.config?.allocatedStorage || '20'),
+        StorageType: data.config?.storageType || 'gp3',
+        StorageEncrypted: data.config?.encrypted !== false,
+        MultiAZ: data.config?.multiAZ || false,
+        PubliclyAccessible: data.config?.publiclyAccessible || false,
+        BackupRetentionPeriod: data.config?.backupRetention || 7,
+        VPCSecurityGroups: vpcSecurityGroups,
+        DBSubnetGroupName: data.config?.dbSubnetGroup || undefined,
+        Tags: [
+          {
+            Key: 'Name',
+            Value: data.label || logicalId,
+          },
+        ],
+      },
+    };
+  },
+
+  alb: (data, logicalId, nodeMap, region, context = {}) => {
+    // Use context security group if available
+    const securityGroups = data.config?.securityGroups || 
+      (context.securityGroupId ? [context.securityGroupId] : undefined);
+
+    return {
+      Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer',
+      Properties: {
+        Name: logicalId.toLowerCase().substring(0, 32),
+        Type: 'application',
+        Scheme: data.config?.scheme || 'internet-facing',
+        IpAddressType: 'ipv4',
+        SecurityGroups: securityGroups,
+        Subnets: data.config?.subnets || undefined,
+        Tags: [
+          {
+            Key: 'Name',
+            Value: data.label || logicalId,
+          },
+        ],
+      },
+    };
+  },
 
   lambda: (data, logicalId) => ({
     Type: 'AWS::Lambda::Function',
@@ -349,11 +407,112 @@ const serviceGenerators = {
       Tags: [
         {
           Key: 'Name',
-          Value: data.label || logicalId,
+          Value: data.label || data.config?.name || logicalId,
         },
       ],
     },
   }),
+
+  // Security Group resource
+  security_group: (data, logicalId, nodeMap) => {
+    // Find VPC reference
+    const vpcEntry = Object.entries(nodeMap).find(([nodeId, lid]) => lid.startsWith('vpc'));
+    const vpcRef = vpcEntry ? { Ref: vpcEntry[1] } : undefined;
+
+    return {
+      Type: 'AWS::EC2::SecurityGroup',
+      Properties: {
+        GroupDescription: data.config?.description || `Security group for ${data.label || logicalId}`,
+        GroupName: data.config?.name || logicalId,
+        VpcId: vpcRef,
+        SecurityGroupIngress: [
+          // Allow SSH
+          {
+            IpProtocol: 'tcp',
+            FromPort: 22,
+            ToPort: 22,
+            CidrIp: '0.0.0.0/0',
+            Description: 'SSH access',
+          },
+          // Allow HTTP
+          {
+            IpProtocol: 'tcp',
+            FromPort: 80,
+            ToPort: 80,
+            CidrIp: '0.0.0.0/0',
+            Description: 'HTTP access',
+          },
+          // Allow HTTPS
+          {
+            IpProtocol: 'tcp',
+            FromPort: 443,
+            ToPort: 443,
+            CidrIp: '0.0.0.0/0',
+            Description: 'HTTPS access',
+          },
+        ],
+        SecurityGroupEgress: [
+          {
+            IpProtocol: '-1',
+            CidrIp: '0.0.0.0/0',
+            Description: 'Allow all outbound traffic',
+          },
+        ],
+        Tags: [
+          {
+            Key: 'Name',
+            Value: data.label || data.config?.name || logicalId,
+          },
+        ],
+      },
+    };
+  },
+
+  // Public Subnet
+  subnet_public: (data, logicalId, nodeMap) => {
+    // Find VPC reference
+    const vpcEntry = Object.entries(nodeMap).find(([nodeId, lid]) => lid.startsWith('vpc'));
+    const vpcRef = vpcEntry ? { Ref: vpcEntry[1] } : undefined;
+
+    return {
+      Type: 'AWS::EC2::Subnet',
+      Properties: {
+        VpcId: vpcRef,
+        CidrBlock: data.config?.cidrBlock || '10.0.1.0/24',
+        AvailabilityZone: data.config?.availabilityZone || { 'Fn::Select': [0, { 'Fn::GetAZs': '' }] },
+        MapPublicIpOnLaunch: true,
+        Tags: [
+          {
+            Key: 'Name',
+            Value: data.label || data.config?.name || `${logicalId}-public`,
+          },
+        ],
+      },
+    };
+  },
+
+  // Private Subnet
+  subnet_private: (data, logicalId, nodeMap) => {
+    // Find VPC reference
+    const vpcEntry = Object.entries(nodeMap).find(([nodeId, lid]) => lid.startsWith('vpc'));
+    const vpcRef = vpcEntry ? { Ref: vpcEntry[1] } : undefined;
+
+    return {
+      Type: 'AWS::EC2::Subnet',
+      Properties: {
+        VpcId: vpcRef,
+        CidrBlock: data.config?.cidrBlock || '10.0.2.0/24',
+        AvailabilityZone: data.config?.availabilityZone || { 'Fn::Select': [1, { 'Fn::GetAZs': '' }] },
+        MapPublicIpOnLaunch: false,
+        Tags: [
+          {
+            Key: 'Name',
+            Value: data.label || data.config?.name || `${logicalId}-private`,
+          },
+        ],
+      },
+    };
+  },
 
   // Additional services
   sqs: (data, logicalId) => ({
@@ -429,25 +588,42 @@ const serviceGenerators = {
     },
   }),
 
-  cloudfront: (data, logicalId) => ({
-    Type: 'AWS::CloudFront::Distribution',
-    Properties: {
-      DistributionConfig: {
-        Enabled: true,
-        DefaultCacheBehavior: {
-          TargetOriginId: `${logicalId}Origin`,
-          ViewerProtocolPolicy: 'redirect-to-https',
-          AllowedMethods: ['GET', 'HEAD', 'OPTIONS'],
-          CachedMethods: ['GET', 'HEAD'],
-          ForwardedValues: {
-            QueryString: false,
-            Cookies: { Forward: 'none' },
+  cloudfront: (data, logicalId) => {
+    // CloudFront requires at least one origin - provide default if none configured
+    const origins = data.config?.origins && data.config.origins.length > 0
+      ? data.config.origins
+      : [
+          {
+            Id: `${logicalId}Origin`,
+            DomainName: data.config?.domainName || `${logicalId.toLowerCase()}.s3.amazonaws.com`,
+            S3OriginConfig: data.config?.isS3Origin !== false ? {} : undefined,
+            CustomOriginConfig: data.config?.isS3Origin === false ? {
+              OriginProtocolPolicy: 'https-only',
+              OriginSSLProtocols: ['TLSv1.2'],
+            } : undefined,
+          }
+        ];
+
+    return {
+      Type: 'AWS::CloudFront::Distribution',
+      Properties: {
+        DistributionConfig: {
+          Enabled: true,
+          DefaultCacheBehavior: {
+            TargetOriginId: `${logicalId}Origin`,
+            ViewerProtocolPolicy: 'redirect-to-https',
+            AllowedMethods: ['GET', 'HEAD', 'OPTIONS'],
+            CachedMethods: ['GET', 'HEAD'],
+            ForwardedValues: {
+              QueryString: false,
+              Cookies: { Forward: 'none' },
+            },
           },
+          Origins: origins,
         },
-        Origins: data.config?.origins || [],
       },
-    },
-  }),
+    };
+  },
 
   elasticache: (data, logicalId) => ({
     Type: 'AWS::ElastiCache::CacheCluster',
