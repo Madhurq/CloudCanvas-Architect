@@ -14,6 +14,8 @@ import './App.css';
 import AIGeneratorModal from './components/AIGeneratorModal';
 import MarketplaceModal from './components/MarketplaceModal';
 import PublishToMarketplace from './components/PublishToMarketplace';
+import SaveArchitectureModal from './components/SaveArchitectureModal';
+import SavedArchitecturesModal from './components/SavedArchitecturesModal';
 
 const AWS_REGIONS = [
   { id: 'us-east-1', name: 'US East (N. Virginia)' },
@@ -61,6 +63,8 @@ function App() {
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
   const fileInputRef = useRef(null);
 
   // Bootstrap session when tokens are present
@@ -224,93 +228,126 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <div className="header-left">
-          <h1>☁️</h1>
-          {pricingStatus.source && (
-            <span className={`badge ${pricingStatus.source === 'aws-api' ? 'badge-success' : 'badge-warning'}`}>
-              {pricingStatus.source === 'aws-api' ? '✓ Live Prices' : '⚠ Cached Prices'}
-            </span>
-          )}
-        </div>
-
-        <div className="header-center">
-          <div className="header-controls">
-            {/* Region is now set via VPC configuration */}
-            {region && (
-              <div className="control-group">
-                <span className="region-badge" title="Region is set from VPC configuration">
-                  🌍 {AWS_REGIONS.find(r => r.id === region)?.name || region}
-                </span>
-              </div>
-            )}
-
-            <div className="control-group">
-              <label htmlFor="pricing-model-select">Pricing:</label>
-              <select
-                id="pricing-model-select"
-                value={pricingModel}
-                onChange={(e) => setPricingModel(e.target.value)}
-                className="select-input"
-              >
-                {PRICING_MODELS.map((pm) => (
-                  <option key={pm.id} value={pm.id}>
-                    {pm.name} {pm.discount > 0 ? `(-${pm.discount}%)` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="header-right">
-        <button className="btn btn-primary" onClick={() => setShowDeployModal(true)} title="Deploy to AWS">
-            🚀 Deploy to AWS
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowAIModal(true)} title="Generate with AI">
-            ✨ AI Design
-          </button>
-          <button className="btn btn-ghost" onClick={() => setShowTemplates(true)} title="Load Template (Ctrl+K)">
-            📋 Templates
-          </button>
-          <button className="btn btn-ghost" onClick={() => setShowMarketplace(true)} title="Browse Marketplace">
-            🛒 Marketplace
-          </button>
-          <button className="btn btn-ghost" onClick={() => setShowPublish(true)} title="Publish to Marketplace">
-            📤 Publish
-          </button>
-          <button className="btn btn-ghost" onClick={handleImportClick} title="Import Architecture">
-            📂 Import
-          </button>
-          <button className="btn btn-ghost" onClick={handleExport} title="Export Architecture (Ctrl+E)">
-            💾 Export
-          </button>
-          <button className="btn btn-ghost" onClick={handleShare} title="Generate Shareable URL">
-            🔗 Share
-          </button>
-          <button className="btn btn-ghost" onClick={clearCanvas} title="Clear Canvas (Ctrl+Shift+C)">
-            🗑️ Clear
-          </button>
-          <button className="btn btn-ghost" onClick={toggleTheme} title="Toggle Theme">
-            {theme === 'dark' ? '🌞' : '🌙'}
-          </button>
+        {/* User Profile - Always visible, positioned first for priority */}
+        <div className="header-user">
           {user && (
             <div className="user-menu">
+              <div className="user-avatar">
+                {user.email?.charAt(0).toUpperCase()}
+              </div>
               <span className="user-email" title={user.email}>
                 {user.email?.split('@')[0]}
               </span>
-              <button className="btn btn-ghost btn-logout" onClick={handleLogout} title="Sign Out">
-                🚪 Logout
+              <button className="btn btn-logout" onClick={handleLogout} title="Sign Out">
+                Logout
               </button>
             </div>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImportFile}
-            style={{ display: 'none' }}
-          />
         </div>
+
+        {/* Logo/Brand */}
+        <div className="header-brand">
+          <span className="brand-icon">☁️</span>
+          <span className="brand-text">CloudCanvas</span>
+        </div>
+
+        {/* Region & Pricing Controls */}
+        <div className="header-controls">
+          <div className="control-group">
+            <label htmlFor="region-select">Region</label>
+            <select
+              id="region-select"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="select-input"
+            >
+              {AWS_REGIONS.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="control-group">
+            <label htmlFor="pricing-model-select">Pricing</label>
+            <select
+              id="pricing-model-select"
+              value={pricingModel}
+              onChange={(e) => setPricingModel(e.target.value)}
+              className="select-input"
+            >
+              {PRICING_MODELS.map((pm) => (
+                <option key={pm.id} value={pm.id}>
+                  {pm.name} {pm.discount > 0 ? `(-${pm.discount}%)` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Primary Actions */}
+        <div className="header-actions-primary">
+          <button className="btn btn-primary btn-deploy" onClick={() => setShowDeployModal(true)} title="Deploy to AWS">
+            <span className="btn-icon">🚀</span>
+            <span className="btn-text">Deploy</span>
+          </button>
+          <button className="btn btn-primary btn-ai" onClick={() => setShowAIModal(true)} title="Generate with AI">
+            <span className="btn-icon">✨</span>
+            <span className="btn-text">AI Design</span>
+          </button>
+        </div>
+
+        {/* Secondary Actions */}
+        <div className="header-actions-secondary">
+          <button className="btn btn-ghost" onClick={() => setShowTemplates(true)} title="Templates (Ctrl+K)">
+            <span className="btn-icon">📋</span>
+            <span className="btn-text">Templates</span>
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowMarketplace(true)} title="Marketplace">
+            <span className="btn-icon">🛒</span>
+            <span className="btn-text">Market</span>
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowPublish(true)} title="Publish">
+            <span className="btn-icon">📤</span>
+            <span className="btn-text">Publish</span>
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowSaveModal(true)} title="Save Architecture">
+            <span className="btn-icon">💾</span>
+            <span className="btn-text">Save</span>
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowLoadModal(true)} title="Load Saved Architecture">
+            <span className="btn-icon">📂</span>
+            <span className="btn-text">Load</span>
+          </button>
+          <button className="btn btn-ghost" onClick={handleImportClick} title="Import">
+            <span className="btn-icon">📥</span>
+            <span className="btn-text">Import</span>
+          </button>
+          <button className="btn btn-ghost" onClick={handleExport} title="Export (Ctrl+E)">
+            <span className="btn-icon">📤</span>
+            <span className="btn-text">Export</span>
+          </button>
+          <button className="btn btn-ghost" onClick={handleShare} title="Share">
+            <span className="btn-icon">🔗</span>
+            <span className="btn-text">Share</span>
+          </button>
+          <button className="btn btn-ghost" onClick={clearCanvas} title="Clear (Ctrl+Shift+C)">
+            <span className="btn-icon">🗑️</span>
+            <span className="btn-text">Clear</span>
+          </button>
+          <button className="btn btn-ghost btn-theme" onClick={toggleTheme} title="Toggle Theme">
+            <span className="btn-icon">{theme === 'dark' ? '🌞' : '🌙'}</span>
+          </button>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          onChange={handleImportFile}
+          style={{ display: 'none' }}
+        />
       </header>
 
       <main className="app-main">
@@ -370,6 +407,16 @@ function App() {
           </div>
         </div>
       )}
+
+      <SaveArchitectureModal 
+        isOpen={showSaveModal} 
+        onClose={() => setShowSaveModal(false)} 
+      />
+
+      <SavedArchitecturesModal 
+        isOpen={showLoadModal} 
+        onClose={() => setShowLoadModal(false)} 
+      />
 
       <footer className="app-footer">
         <p className="keyboard-shortcuts">

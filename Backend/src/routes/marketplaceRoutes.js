@@ -7,6 +7,7 @@ import {
   deleteMarketplaceListing,
   purchaseFromMarketplace,
   addReview,
+  getReviews,
   getMyListings,
 } from '../controllers/marketplaceController.js';
 import { authMiddleware } from '../middleware/middleware.js';
@@ -16,6 +17,7 @@ const router = express.Router();
 // Public routes
 router.get('/', getMarketplaceListings);
 router.get('/:id', getMarketplaceListing);
+router.get('/:id/reviews', getReviews);
 
 // Protected routes
 router.post('/publish', authMiddleware, publishToMarketplace);
