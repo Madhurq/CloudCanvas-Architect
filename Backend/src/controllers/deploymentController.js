@@ -155,12 +155,14 @@ export const createDeployment = async (req, res) => {
         
         return res.status(403).json(
           formatResponse(false, null, 
-            `🔒 AWS Permission Error: Your IAM user does not have the required permission: ${missingPermission}\n\n` +
-            `Quick Fix:\n` +
-            `1. Go to AWS IAM Console → Users → Select your user\n` +
-            `2. Click "Add permissions" → "Attach policies directly"\n` +
-            `3. Search and attach "PowerUserAccess" (for testing) or create a custom policy\n\n` +
-            `See IAM_PERMISSIONS_FIX.md for detailed instructions.\n\n` +
+            `🔒 AWS Permission Error: Missing permission: ${missingPermission}\n\n` +
+            `Least-Privilege Setup:\n` +
+            `1. IAM → Users → Select your deploy user\n` +
+            `2. "Add permissions" → "Attach policies directly"\n` +
+            `3. Attach AWS managed: AWSCloudFormationFullAccess\n` +
+            `4. Attach service-scoped policies only for services in your design (EC2, S3, RDS, ALB, Lambda).\n` +
+            `   Or create a custom policy with CloudFormation stack ops + minimal service actions.\n\n` +
+            `See IAM_PERMISSIONS_FIX.md and the in-app IAM Setup Guide for a copyable policy template.\n\n` +
             `Full error: ${errorMessage}`
           )
         );
