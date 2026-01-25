@@ -107,6 +107,13 @@ class APIClient {
     return this.request('/api/auth/profile', { method: 'GET' });
   }
 
+  async updateProfile(firstName, lastName) {
+    return this.request('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ firstName, lastName }),
+    });
+  }
+
   async logout() {
     this.clearTokens();
   }

@@ -122,6 +122,25 @@ body {
   box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
 }
 
+/* Clickable profile trigger */
+.user-profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+
+.user-profile-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-profile-trigger:hover .user-email {
+  color: var(--accent-primary);
+}
+
 .user-avatar {
   width: 26px;
   height: 26px;
@@ -212,6 +231,7 @@ body {
 
 .select-input {
   padding: 4px 8px;
+  padding-right: 24px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -220,17 +240,48 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   min-width: 100px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M3 4.5L6 8l3-3.5H3z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
 }
 
 .select-input:hover {
   border-color: var(--accent-primary);
-  background: rgba(59, 130, 246, 0.1);
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
 .select-input:focus {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* Style the dropdown options for dark theme */
+.select-input option {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  padding: 8px 12px;
+}
+
+.select-input option:hover,
+.select-input option:checked {
+  background-color: #334155;
+  color: #f8fafc;
+}
+
+/* Light theme dropdown options */
+[data-theme="light"] .select-input option {
+  background-color: #ffffff;
+  color: #1e293b;
+}
+
+[data-theme="light"] .select-input option:hover,
+[data-theme="light"] .select-input option:checked {
+  background-color: #f1f5f9;
+  color: #0f172a;
 }
 
 /* Primary Actions */
