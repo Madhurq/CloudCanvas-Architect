@@ -16,6 +16,8 @@ import MarketplaceModal from './components/MarketplaceModal';
 import PublishToMarketplace from './components/PublishToMarketplace';
 import SaveArchitectureModal from './components/SaveArchitectureModal';
 import SavedArchitecturesModal from './components/SavedArchitecturesModal';
+import ProfileModal from './components/ProfileModal';
+import apiClient from './services/apiClient';
 
 const PRICING_MODELS = [
   { id: 'on-demand', name: 'On-Demand', discount: 0 },
@@ -54,12 +56,32 @@ function App() {
   const [showPublish, setShowPublish] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [displayName, setDisplayName] = useState('');
   const fileInputRef = useRef(null);
 
   // Bootstrap session when tokens are present
   useEffect(() => {
     initializeSession();
   }, [initializeSession]);
+
+  // Load user profile to get display name
+  useEffect(() => {
+    const loadUserProfile = async () => {
+      if (user) {
+        try {
+          const response = await apiClient.getProfile();
+          const userData = response?.data?.user;
+          if (userData?.first_name) {
+            setDisplayName(userData.first_name);
+          }
+        } catch (err) {
+          console.warn('Failed to load user profile:', err);
+        }
+      }
+    };
+    loadUserProfile();
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -221,12 +243,18 @@ function App() {
         <div className="header-user">
           {user && (
             <div className="user-menu">
-              <div className="user-avatar">
-                {user.email?.charAt(0).toUpperCase()}
+              <div
+                className="user-profile-trigger"
+                onClick={() => setShowProfileModal(true)}
+                title="Click to edit profile"
+              >
+                <div className="user-avatar">
+                  {(displayName || user.email)?.charAt(0).toUpperCase()}
+                </div>
+                <span className="user-email">
+                  {displayName || user.email?.split('@')[0]}
+                </span>
               </div>
-              <span className="user-email" title={user.email}>
-                {user.email?.split('@')[0]}
-              </span>
               <button className="btn btn-logout" onClick={handleLogout} title="Sign Out">
                 Logout
               </button>
@@ -282,7 +310,7 @@ function App() {
             <span className="btn-text">Market</span>
           </button>
           <button className="btn btn-ghost" onClick={() => setShowPublish(true)} title="Publish">
-            <span className="btn-icon">📤</span>
+            <span className="btn-icon">🌐</span>
             <span className="btn-text">Publish</span>
           </button>
           <button className="btn btn-ghost" onClick={() => setShowSaveModal(true)} title="Save Architecture">
@@ -381,14 +409,20 @@ function App() {
         </div>
       )}
 
-      <SaveArchitectureModal 
-        isOpen={showSaveModal} 
-        onClose={() => setShowSaveModal(false)} 
+      <SaveArchitectureModal
+        isOpen={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
       />
 
-      <SavedArchitecturesModal 
-        isOpen={showLoadModal} 
-        onClose={() => setShowLoadModal(false)} 
+      <SavedArchitecturesModal
+        isOpen={showLoadModal}
+        onClose={() => setShowLoadModal(false)}
+      />
+
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        onProfileUpdate={(name) => setDisplayName(name)}
       />
 
       <footer className="app-footer">
