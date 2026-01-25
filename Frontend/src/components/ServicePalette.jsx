@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { awsServices, serviceCategories, containerTypes } from '../data/awsServices';
 
 const ServicePalette = () => {
-    const [activeCategory, setActiveCategory] = useState('compute');
+    const [activeCategory, setActiveCategory] = useState('infrastructure');
     const [hoveredService, setHoveredService] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
 
