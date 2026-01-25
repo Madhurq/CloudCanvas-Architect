@@ -6,6 +6,43 @@ import apiClient from '../services/apiClient';
 let nodeId = 0;
 const getId = () => `node_${nodeId++}`;
 
+// Helper function to check if a node is descendant of a container
+const isNodeDescendantOf = (node, containerId, allNodes) => {
+    if (!node.parentNode) return false;
+    if (node.parentNode === containerId) return true;
+    
+    const parent = allNodes.find(n => n.id === node.parentNode);
+    if (!parent) return false;
+    
+    return isNodeDescendantOf(parent, containerId, allNodes);
+};
+
+// Helper function to sync node regions with their parent containers
+const syncNodeRegionsWithParents = (nodes, defaultRegion) => {
+    return nodes.map(node => {
+        // Skip VPC nodes - they have their own regions
+        if (node.data?.serviceType === 'vpc') {
+            return node;
+        }
+        
+        // If node has a parent, inherit parent's region
+        if (node.parentNode) {
+            const parent = nodes.find(n => n.id === node.parentNode);
+            if (parent?.data?.region && parent.data.region !== node.data?.region) {
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        region: parent.data.region,
+                    },
+                };
+            }
+        }
+        
+        return node;
+    });
+};
+
 // History management for undo/redo
 let history = [];
 let historyIndex = -1;
@@ -112,9 +149,13 @@ const useStore = create((set, get) => ({
     // Set nodes (used by React Flow) - handles both direct values and callbacks
     setNodes: (nodesOrUpdater) => {
         if (typeof nodesOrUpdater === 'function') {
-            set((state) => ({ nodes: nodesOrUpdater(state.nodes) }));
+            set((state) => {
+                const updatedNodes = nodesOrUpdater(state.nodes);
+                // Sync regions after node updates
+                return { nodes: syncNodeRegionsWithParents(updatedNodes, state.region) };
+            });
         } else {
-            set({ nodes: nodesOrUpdater });
+            set((state) => ({ nodes: syncNodeRegionsWithParents(nodesOrUpdater, state.region) }));
         }
     },
 
@@ -131,6 +172,8 @@ const useStore = create((set, get) => ({
     onNodesChange: (changes) => {
         set((state) => {
             const newNodes = [...state.nodes];
+            const currentRegion = state.region;
+            
             changes.forEach((change) => {
                 if (change.type === 'position' && change.position) {
                     const nodeIndex = newNodes.findIndex((n) => n.id === change.id);
@@ -152,6 +195,40 @@ const useStore = create((set, get) => ({
                             ...newNodes[nodeIndex],
                             selected: change.selected,
                         };
+                    }
+                }
+                // Handle parent change - update region when node moves between containers
+                if (change.type === 'position' && change.dragging === false) {
+                    const nodeIndex = newNodes.findIndex((n) => n.id === change.id);
+                    if (nodeIndex !== -1) {
+                        const node = newNodes[nodeIndex];
+                        const oldParentNode = node.parentNode;
+                        
+                        // Check if parentNode changed by looking at changes with parentNode property
+                        const parentNodeChange = changes.find(c => c.id === change.id && 'parentNode' in c);
+                        const newParentNode = parentNodeChange?.parentNode;
+                        
+                        // If parent changed or if we have a parent, update the region
+                        if (newParentNode !== undefined && newParentNode !== oldParentNode) {
+                            let newRegion = currentRegion;
+                            
+                            if (newParentNode) {
+                                // Find the new parent and get its region
+                                const parent = newNodes.find(n => n.id === newParentNode);
+                                if (parent?.data?.region) {
+                                    newRegion = parent.data.region;
+                                }
+                            }
+                            
+                            // Update node's region
+                            newNodes[nodeIndex] = {
+                                ...newNodes[nodeIndex],
+                                data: {
+                                    ...newNodes[nodeIndex].data,
+                                    region: newRegion,
+                                },
+                            };
+                        }
                     }
                 }
             });
@@ -191,6 +268,10 @@ const useStore = create((set, get) => ({
         if (!service) return;
 
         const currentRegion = get().region;
+        const nodes = get().nodes;
+        
+        // Get parent node data if parentNode is provided
+        const parentNodeData = parentNode ? nodes.find(n => n.id === parentNode) : null;
 
         // Create node based on type (container or regular service)
         const newNode = {
@@ -202,7 +283,7 @@ const useStore = create((set, get) => ({
                 serviceType: service.id,
                 icon: service.icon,
                 color: service.color,
-                region: currentRegion,
+                region: parentNodeData?.data?.region || currentRegion,
                 config: { ...service.defaultConfig },
                 // Container-specific data
                 ...(isContainer && {
@@ -268,11 +349,21 @@ const useStore = create((set, get) => ({
     // Update node configuration
     updateNodeConfig: (nodeId, config) => {
         set((state) => ({
-            nodes: state.nodes.map((node) =>
-                node.id === nodeId
-                    ? { ...node, data: { ...node.data, config: { ...node.data.config, ...config } } }
-                    : node
-            ),
+            nodes: state.nodes.map((node) => {
+                if (node.id === nodeId) {
+                    // If config has a 'name' field, also update the label
+                    const newLabel = config.name || node.data.label;
+                    return {
+                        ...node,
+                        data: {
+                            ...node.data,
+                            label: newLabel,
+                            config: { ...node.data.config, ...config }
+                        }
+                    };
+                }
+                return node;
+            }),
         }));
     },
 
@@ -285,6 +376,97 @@ const useStore = create((set, get) => ({
                     : node
             ),
         }));
+    },
+
+    // Sync node region based on current parent (called after drag)
+    syncNodeRegion: (nodeId) => {
+        set((state) => {
+            const node = state.nodes.find(n => n.id === nodeId);
+            if (!node || node.data?.serviceType === 'vpc') return state;
+            
+            // Find which container this node is actually inside based on position
+            let actualParent = null;
+            const containers = state.nodes.filter(n => n.data?.isContainer);
+            
+            for (const container of containers) {
+                const nodeAbsX = node.parentNode === container.id ? 
+                    container.position.x + node.position.x : 
+                    node.position.x;
+                const nodeAbsY = node.parentNode === container.id ? 
+                    container.position.y + node.position.y : 
+                    node.position.y;
+                
+                const containerX = container.position.x;
+                const containerY = container.position.y;
+                const containerWidth = container.style?.width || container.data?.minWidth || 300;
+                const containerHeight = container.style?.height || container.data?.minHeight || 200;
+                
+                // Check if node center is inside container bounds
+                if (nodeAbsX >= containerX && 
+                    nodeAbsX <= containerX + containerWidth &&
+                    nodeAbsY >= containerY && 
+                    nodeAbsY <= containerY + containerHeight) {
+                    actualParent = container;
+                    break;
+                }
+            }
+
+            let newRegion = state.region;
+            let needsUpdate = false;
+            const updatedNodes = state.nodes.map((n) => {
+                if (n.id !== nodeId) return n;
+                
+                const updates = { ...n };
+                
+                // Update parentNode if it changed
+                if (actualParent && n.parentNode !== actualParent.id) {
+                    updates.parentNode = actualParent.id;
+                    updates.extent = 'parent';
+                    needsUpdate = true;
+                } else if (!actualParent && n.parentNode) {
+                    delete updates.parentNode;
+                    delete updates.extent;
+                    needsUpdate = true;
+                }
+                
+                // Update region based on actual parent
+                if (actualParent?.data?.region) {
+                    newRegion = actualParent.data.region;
+                } else {
+                    newRegion = state.region;
+                }
+                
+                if (n.data.region !== newRegion) {
+                    updates.data = { ...updates.data, region: newRegion };
+                    needsUpdate = true;
+                }
+                
+                return updates;
+            });
+            
+            if (needsUpdate) {
+                return { nodes: updatedNodes };
+            }
+            return state;
+        });
+    },
+
+    // Update container region and cascade to all children
+    updateContainerRegion: (containerId, region) => {
+        set((state) => {
+            const updatedNodes = state.nodes.map((node) => {
+                // Update the container itself
+                if (node.id === containerId) {
+                    return { ...node, data: { ...node.data, region } };
+                }
+                // Update direct and nested children of this container
+                if (isNodeDescendantOf(node, containerId, state.nodes)) {
+                    return { ...node, data: { ...node.data, region } };
+                }
+                return node;
+            });
+            return { nodes: updatedNodes };
+        });
     },
 
     // Update edge data

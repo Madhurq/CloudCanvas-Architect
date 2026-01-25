@@ -44,8 +44,8 @@ const GroupNode = ({ data, selected }) => {
             style={{
                 '--container-border': style.borderColor,
                 '--container-bg': style.bodyBg,
-                width: '100%',
-                height: '100%',
+                width: data.minWidth || 300,
+                height: data.minHeight || 200,
             }}
         >
             {/* Connection handles - same as regular service nodes */}

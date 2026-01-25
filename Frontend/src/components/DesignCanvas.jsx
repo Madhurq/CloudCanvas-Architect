@@ -45,6 +45,7 @@ const DesignCanvasInner = () => {
         addNode,
         setEdges,
         selectNode,
+        syncNodeRegion,
         region,
     } = useStore();
 
@@ -211,6 +212,11 @@ const DesignCanvasInner = () => {
         selectNode(node.id);
     }, [selectNode]);
 
+    const onNodeDragStop = useCallback((event, node) => {
+        // Sync region after dragging node (may have moved to different container)
+        syncNodeRegion(node.id);
+    }, [syncNodeRegion]);
+
     return (
         <div className="design-canvas">
             <ReactFlow
@@ -222,6 +228,7 @@ const DesignCanvasInner = () => {
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 onNodeDoubleClick={onNodeDoubleClick}
+                onNodeDragStop={onNodeDragStop}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 fitView
