@@ -23,14 +23,14 @@ const ConfigModal = () => {
 
     const node = nodes.find((n) => n.id === selectedNode);
     const serviceType = node?.data?.serviceType;
-    
+
     // Check if it's a container type (VPC, subnet, security group) or regular service
     const isContainer = containerTypes && containerTypes[serviceType];
     const service = isContainer ? containerTypes[serviceType] : awsServices[serviceType];
-    
+
     // Check if this is a VPC node (controls global region)
     const isVPC = serviceType === 'vpc';
-    
+
     // Get VPC node for inheriting region
     const vpcNode = nodes.find(n => n.data?.serviceType === 'vpc');
     const inheritedRegion = vpcNode?.data?.region || region;
@@ -65,12 +65,12 @@ const ConfigModal = () => {
     const handleSave = () => {
         updateNodeConfig(selectedNode, localConfig);
         updateNodeRegion(selectedNode, localRegion);
-        
+
         // If this is a VPC, also set the global region
         if (isVPC) {
             setRegion(localRegion);
         }
-        
+
         closeConfigModal();
     };
 

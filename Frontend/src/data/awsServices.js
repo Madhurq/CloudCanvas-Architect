@@ -14,14 +14,24 @@ export const awsServices = {
       count: 1,
       hoursPerMonth: 730,
       os: 'linux',
-      ebsStorage: 30
+      ebsStorage: 30,
+      ebsVolumeType: 'gp3',
+      ebsEncrypted: true,
+      tenancy: 'default',
+      monitoring: 'basic',
+      autoScaling: false
     },
     configFields: [
-      { key: 'instanceType', label: 'Instance Type', type: 'select', options: ['t3.micro', 't3.small', 't3.medium', 't3.large', 't3.xlarge', 'm5.large', 'm5.xlarge'] },
+      { key: 'instanceType', label: 'Instance Type', type: 'select', options: ['t3.micro', 't3.small', 't3.medium', 't3.large', 't3.xlarge', 't2.micro', 't2.small', 't2.medium', 't2.large', 't2.xlarge', 'm5.large', 'm5.xlarge', 'c5.large', 'c5.xlarge', 'r5.large'] },
       { key: 'count', label: 'Instance Count', type: 'number', min: 1, max: 100 },
       { key: 'hoursPerMonth', label: 'Hours/Month', type: 'number', min: 1, max: 730 },
-      { key: 'os', label: 'Operating System', type: 'select', options: ['linux', 'windows'] },
-      { key: 'ebsStorage', label: 'EBS Storage (GB)', type: 'number', min: 8, max: 16000 }
+      { key: 'os', label: 'Operating System', type: 'select', options: ['linux', 'windows', 'rhel', 'ubuntu'] },
+      { key: 'ebsStorage', label: 'EBS Storage (GB)', type: 'number', min: 8, max: 16000 },
+      { key: 'ebsVolumeType', label: 'EBS Volume Type', type: 'select', options: ['gp2', 'gp3', 'io1', 'io2', 'st1', 'sc1'] },
+      { key: 'ebsEncrypted', label: 'EBS Encryption', type: 'boolean' },
+      { key: 'tenancy', label: 'Tenancy', type: 'select', options: ['default', 'dedicated', 'host'] },
+      { key: 'monitoring', label: 'Monitoring', type: 'select', options: ['basic', 'detailed'] },
+      { key: 'autoScaling', label: 'Auto Scaling Enabled', type: 'boolean' }
     ],
     allowedConnections: ['rds', 's3', 'elasticache', 'dynamodb', 'sqs', 'sns'],
     defaultPorts: { inbound: [80, 443, 22], outbound: [5432, 6379, 443] }
@@ -62,12 +72,28 @@ export const awsServices = {
     defaultConfig: {
       requestsPerMonth: 1000000,
       avgDurationMs: 200,
-      memoryMB: 128
+      memoryMB: 256,
+      architecture: 'x86_64',
+      runtime: 'nodejs18.x',
+      timeout: 30,
+      ephemeralStorageMB: 512,
+      provisionedConcurrency: 0,
+      vpcEnabled: false,
+      tracing: 'Active',
+      layers: 0
     },
     configFields: [
       { key: 'requestsPerMonth', label: 'Requests/Month', type: 'number', min: 0, max: 1000000000 },
       { key: 'avgDurationMs', label: 'Avg Duration (ms)', type: 'number', min: 1, max: 900000 },
-      { key: 'memoryMB', label: 'Memory (MB)', type: 'select', options: [128, 256, 512, 1024, 2048, 4096, 10240] }
+      { key: 'memoryMB', label: 'Memory (MB)', type: 'select', options: [128, 256, 512, 1024, 2048, 3008, 4096, 8192, 10240] },
+      { key: 'architecture', label: 'Architecture', type: 'select', options: ['x86_64', 'arm64'] },
+      { key: 'runtime', label: 'Runtime', type: 'select', options: ['nodejs18.x', 'nodejs20.x', 'python3.11', 'python3.12', 'java17', 'java21', 'dotnet6', 'go1.x', 'ruby3.2'] },
+      { key: 'timeout', label: 'Timeout (seconds)', type: 'number', min: 1, max: 900 },
+      { key: 'ephemeralStorageMB', label: 'Ephemeral Storage (MB)', type: 'number', min: 512, max: 10240 },
+      { key: 'provisionedConcurrency', label: 'Provisioned Concurrency', type: 'number', min: 0, max: 5000 },
+      { key: 'vpcEnabled', label: 'VPC Enabled', type: 'boolean' },
+      { key: 'tracing', label: 'X-Ray Tracing', type: 'select', options: ['Active', 'PassThrough', 'Disabled'] },
+      { key: 'layers', label: 'Lambda Layers', type: 'number', min: 0, max: 5 }
     ],
     allowedConnections: ['s3', 'dynamodb', 'rds', 'sqs', 'sns', 'eventbridge'],
     defaultPorts: { inbound: [], outbound: [443] }
@@ -133,14 +159,28 @@ export const awsServices = {
       storageClass: 'STANDARD',
       putRequests: 100000,
       getRequests: 1000000,
-      dataTransferOutGB: 50
+      dataTransferOutGB: 50,
+      versioning: true,
+      encryption: 'SSE-S3',
+      lifecyclePolicy: true,
+      publicAccessBlock: true,
+      intelligentTiering: false,
+      replication: false,
+      accessLogging: false
     },
     configFields: [
       { key: 'storageGB', label: 'Storage (GB)', type: 'number', min: 1, max: 100000 },
-      { key: 'storageClass', label: 'Storage Class', type: 'select', options: ['STANDARD', 'STANDARD_IA', 'GLACIER', 'DEEP_ARCHIVE'] },
+      { key: 'storageClass', label: 'Storage Class', type: 'select', options: ['STANDARD', 'STANDARD_IA', 'ONE_ZONE_IA', 'GLACIER', 'GLACIER_IR', 'DEEP_ARCHIVE'] },
       { key: 'putRequests', label: 'PUT Requests/Month', type: 'number', min: 0, max: 100000000 },
       { key: 'getRequests', label: 'GET Requests/Month', type: 'number', min: 0, max: 100000000 },
-      { key: 'dataTransferOutGB', label: 'Data Transfer Out (GB)', type: 'number', min: 0, max: 100000 }
+      { key: 'dataTransferOutGB', label: 'Data Transfer Out (GB)', type: 'number', min: 0, max: 100000 },
+      { key: 'versioning', label: 'Versioning Enabled', type: 'boolean' },
+      { key: 'encryption', label: 'Encryption', type: 'select', options: ['SSE-S3', 'SSE-KMS', 'SSE-C', 'None'] },
+      { key: 'lifecyclePolicy', label: 'Lifecycle Policy', type: 'boolean' },
+      { key: 'publicAccessBlock', label: 'Block Public Access', type: 'boolean' },
+      { key: 'intelligentTiering', label: 'Intelligent Tiering', type: 'boolean' },
+      { key: 'replication', label: 'Cross-Region Replication', type: 'boolean' },
+      { key: 'accessLogging', label: 'Access Logging', type: 'boolean' }
     ],
     allowedConnections: [],
     defaultPorts: { inbound: [443], outbound: [] }
@@ -180,14 +220,30 @@ export const awsServices = {
     defaultConfig: {
       instanceClass: 'db.t3.small',
       engine: 'postgres',
+      engineVersion: '15.4',
       storageGB: 100,
-      multiAZ: false
+      storageType: 'gp3',
+      multiAZ: false,
+      backupRetention: 7,
+      encrypted: true,
+      performanceInsights: true,
+      iamAuth: false,
+      deletionProtection: true,
+      autoMinorVersionUpgrade: true
     },
     configFields: [
-      { key: 'instanceClass', label: 'Instance Class', type: 'select', options: ['db.t3.micro', 'db.t3.small', 'db.t3.medium', 'db.t3.large', 'db.r5.large'] },
-      { key: 'engine', label: 'Database Engine', type: 'select', options: ['postgres', 'mysql', 'mariadb'] },
+      { key: 'instanceClass', label: 'Instance Class', type: 'select', options: ['db.t3.micro', 'db.t3.small', 'db.t3.medium', 'db.t3.large', 'db.r5.large', 'db.r5.xlarge', 'db.r6g.large'] },
+      { key: 'engine', label: 'Database Engine', type: 'select', options: ['postgres', 'mysql', 'mariadb', 'sqlserver', 'oracle'] },
+      { key: 'engineVersion', label: 'Engine Version', type: 'text' },
       { key: 'storageGB', label: 'Storage (GB)', type: 'number', min: 20, max: 65536 },
-      { key: 'multiAZ', label: 'Multi-AZ Deployment', type: 'boolean' }
+      { key: 'storageType', label: 'Storage Type', type: 'select', options: ['gp2', 'gp3', 'io1', 'magnetic'] },
+      { key: 'multiAZ', label: 'Multi-AZ Deployment', type: 'boolean' },
+      { key: 'backupRetention', label: 'Backup Retention (days)', type: 'number', min: 0, max: 35 },
+      { key: 'encrypted', label: 'Encryption at Rest', type: 'boolean' },
+      { key: 'performanceInsights', label: 'Performance Insights', type: 'boolean' },
+      { key: 'iamAuth', label: 'IAM Authentication', type: 'boolean' },
+      { key: 'deletionProtection', label: 'Deletion Protection', type: 'boolean' },
+      { key: 'autoMinorVersionUpgrade', label: 'Auto Minor Version Upgrade', type: 'boolean' }
     ],
     allowedConnections: [],
     defaultPorts: { inbound: [5432, 3306], outbound: [] }
@@ -276,13 +332,27 @@ export const awsServices = {
       hoursPerMonth: 730,
       lcuHours: 10,
       newConnections: 100000,
-      processedBytes: 50
+      processedBytes: 50,
+      listenerRules: 10,
+      targetType: 'instance',
+      healthCheckPath: '/health',
+      healthCheckInterval: 30,
+      sslPolicy: 'ELBSecurityPolicy-TLS13-1-2-2021-06',
+      accessLogs: false,
+      idleTimeout: 60
     },
     configFields: [
       { key: 'hoursPerMonth', label: 'Hours/Month', type: 'number', min: 1, max: 730 },
       { key: 'lcuHours', label: 'LCU-Hours/Hour', type: 'number', min: 0, max: 1000 },
       { key: 'newConnections', label: 'New Connections/Month', type: 'number', min: 0, max: 100000000 },
-      { key: 'processedBytes', label: 'Processed Data (GB)', type: 'number', min: 0, max: 100000 }
+      { key: 'processedBytes', label: 'Processed Data (GB)', type: 'number', min: 0, max: 100000 },
+      { key: 'listenerRules', label: 'Listener Rules', type: 'number', min: 1, max: 100 },
+      { key: 'targetType', label: 'Target Type', type: 'select', options: ['instance', 'ip', 'lambda'] },
+      { key: 'healthCheckPath', label: 'Health Check Path', type: 'text' },
+      { key: 'healthCheckInterval', label: 'Health Check Interval (s)', type: 'select', options: [5, 10, 15, 20, 30, 60] },
+      { key: 'sslPolicy', label: 'SSL Policy', type: 'select', options: ['ELBSecurityPolicy-TLS13-1-2-2021-06', 'ELBSecurityPolicy-TLS-1-2-2017-01', 'ELBSecurityPolicy-2016-08'] },
+      { key: 'accessLogs', label: 'Access Logging', type: 'boolean' },
+      { key: 'idleTimeout', label: 'Idle Timeout (s)', type: 'number', min: 1, max: 4000 }
     ],
     allowedConnections: ['ec2', 'ecs', 'lambda'],
     defaultPorts: { inbound: [80, 443], outbound: [80, 8080] }
