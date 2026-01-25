@@ -17,7 +17,7 @@ const AWS_REGIONS = [
 ];
 
 const ConfigModal = () => {
-    const { nodes, selectedNode, closeConfigModal, updateNodeConfig, updateNodeRegion, setRegion, region } = useStore();
+    const { nodes, selectedNode, closeConfigModal, updateNodeConfig, updateNodeRegion, updateContainerRegion, region } = useStore();
     const [localConfig, setLocalConfig] = useState({});
     const [localRegion, setLocalRegion] = useState('us-east-1');
 
@@ -28,27 +28,34 @@ const ConfigModal = () => {
     const isContainer = containerTypes && containerTypes[serviceType];
     const service = isContainer ? containerTypes[serviceType] : awsServices[serviceType];
     
-    // Check if this is a VPC node (controls global region)
+    // Check if this is a VPC node
     const isVPC = serviceType === 'vpc';
     
-    // Get VPC node for inheriting region
-    const vpcNode = nodes.find(n => n.data?.serviceType === 'vpc');
-    const inheritedRegion = vpcNode?.data?.region || region;
+    // Find the nearest parent VPC by walking up the parent chain
+    const findRegionForNode = (currentNode) => {
+        if (!currentNode) return region;
+        if (currentNode.data?.serviceType === 'vpc') {
+            return currentNode.data.region || region;
+        }
+        if (currentNode.parentNode) {
+            const parent = nodes.find(n => n.id === currentNode.parentNode);
+            return findRegionForNode(parent);
+        }
+        return region;
+    };
+    
+    const inheritedRegion = findRegionForNode(node);
 
     useEffect(() => {
         if (node?.data?.config) {
             setLocalConfig({ ...node.data.config });
         }
-        if (isVPC && node?.data?.region) {
-            // VPC uses its own region
+        if (node?.data?.region) {
             setLocalRegion(node.data.region);
-        } else if (node?.data?.region) {
-            setLocalRegion(node.data.region);
-        } else if (vpcNode?.data?.region) {
-            // Non-VPC nodes inherit from VPC
-            setLocalRegion(vpcNode.data.region);
+        } else {
+            setLocalRegion(inheritedRegion);
         }
-    }, [node, isVPC, vpcNode]);
+    }, [node, inheritedRegion]);
 
     if (!node || !service) return null;
 
@@ -58,17 +65,21 @@ const ConfigModal = () => {
             parsedValue = parseFloat(value) || 0;
         } else if (type === 'boolean') {
             parsedValue = value === 'true' || value === true;
+        } else {
+            // text and other fields stay as-is
+            parsedValue = value;
         }
         setLocalConfig((prev) => ({ ...prev, [key]: parsedValue }));
     };
 
     const handleSave = () => {
         updateNodeConfig(selectedNode, localConfig);
-        updateNodeRegion(selectedNode, localRegion);
         
-        // If this is a VPC, also set the global region
+        // If this is a VPC, update it and all its children
         if (isVPC) {
-            setRegion(localRegion);
+            updateContainerRegion(selectedNode, localRegion);
+        } else {
+            updateNodeRegion(selectedNode, localRegion);
         }
         
         closeConfigModal();
@@ -105,7 +116,7 @@ const ConfigModal = () => {
                                 ))}
                             </select>
                             <p className="hint hint-important">
-                                🔒 This sets the region for ALL resources in this VPC
+                                🔒 This sets the region for this VPC and all resources inside it
                             </p>
                         </div>
                     ) : (
@@ -113,11 +124,11 @@ const ConfigModal = () => {
                             <label>🌍 Region</label>
                             <div className="inherited-region">
                                 <span className="region-value">
-                                    {AWS_REGIONS.find(r => r.value === inheritedRegion)?.label || inheritedRegion}
+                                    {AWS_REGIONS.find(r => r.value === localRegion)?.label || localRegion}
                                 </span>
-                                <span className="inherited-badge">Inherited from VPC</span>
+                                <span className="inherited-badge">Inherited from nearest parent VPC</span>
                             </div>
-                            <p className="hint">Region is set by the VPC configuration</p>
+                            <p className="hint">Region is set by the nearest parent VPC configuration</p>
                         </div>
                     )}
 
@@ -151,6 +162,13 @@ const ConfigModal = () => {
                                         {localConfig[field.key] ? 'Enabled' : 'Disabled'}
                                     </label>
                                 </div>
+                            ) : field.type === 'text' ? (
+                                <input
+                                    type="text"
+                                    id={field.key}
+                                    value={localConfig[field.key] || ''}
+                                    onChange={(e) => handleChange(field.key, e.target.value, field.type)}
+                                />
                             ) : (
                                 <input
                                     type="number"

@@ -1415,7 +1415,7 @@ export const containerTypes = {
       { key: 'name', label: 'VPC Name', type: 'text' },
       { key: 'cidrBlock', label: 'CIDR Block', type: 'text' },
     ],
-    defaultSize: { width: 500, height: 350 },
+    defaultSize: { width: 380, height: 260 },
   },
   subnet_public: {
     id: 'subnet_public',
