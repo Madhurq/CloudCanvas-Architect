@@ -14,6 +14,8 @@ import './App.css';
 import AIGeneratorModal from './components/AIGeneratorModal';
 import MarketplaceModal from './components/MarketplaceModal';
 import PublishToMarketplace from './components/PublishToMarketplace';
+import SaveArchitectureModal from './components/SaveArchitectureModal';
+import SavedArchitecturesModal from './components/SavedArchitecturesModal';
 
 const AWS_REGIONS = [
   { id: 'us-east-1', name: 'US East (N. Virginia)' },
@@ -61,6 +63,8 @@ function App() {
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
   const fileInputRef = useRef(null);
 
   // Bootstrap session when tokens are present
@@ -308,12 +312,20 @@ function App() {
             <span className="btn-icon">📤</span>
             <span className="btn-text">Publish</span>
           </button>
-          <button className="btn btn-ghost" onClick={handleImportClick} title="Import">
+          <button className="btn btn-ghost" onClick={() => setShowSaveModal(true)} title="Save Architecture">
+            <span className="btn-icon">💾</span>
+            <span className="btn-text">Save</span>
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowLoadModal(true)} title="Load Saved Architecture">
             <span className="btn-icon">📂</span>
+            <span className="btn-text">Load</span>
+          </button>
+          <button className="btn btn-ghost" onClick={handleImportClick} title="Import">
+            <span className="btn-icon">📥</span>
             <span className="btn-text">Import</span>
           </button>
           <button className="btn btn-ghost" onClick={handleExport} title="Export (Ctrl+E)">
-            <span className="btn-icon">💾</span>
+            <span className="btn-icon">📤</span>
             <span className="btn-text">Export</span>
           </button>
           <button className="btn btn-ghost" onClick={handleShare} title="Share">
@@ -395,6 +407,16 @@ function App() {
           </div>
         </div>
       )}
+
+      <SaveArchitectureModal 
+        isOpen={showSaveModal} 
+        onClose={() => setShowSaveModal(false)} 
+      />
+
+      <SavedArchitecturesModal 
+        isOpen={showLoadModal} 
+        onClose={() => setShowLoadModal(false)} 
+      />
 
       <footer className="app-footer">
         <p className="keyboard-shortcuts">
