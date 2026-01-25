@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import useStore from '../store/useStore';
 import apiClient from '../services/apiClient';
+import IAMSetupGuide from './IAMSetupGuide';
 import '../styles/DeploymentPanel.css';
 
 export default function DeploymentPanel({ isOpen, onClose }) {
@@ -18,6 +19,7 @@ export default function DeploymentPanel({ isOpen, onClose }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeTab, setActiveTab] = useState('deploy'); // 'deploy' or 'history'
   const [pollingInterval, setPollingInterval] = useState(null);
+  const [showIAMGuide, setShowIAMGuide] = useState(false);
 
   // Load deployment history when modal opens
   useEffect(() => {
@@ -106,15 +108,22 @@ export default function DeploymentPanel({ isOpen, onClose }) {
     }
   };
 
-  const startStatusPolling = (deploymentId) => {
-    // Poll every 10 seconds
+  const startStatusPolling = (deploymentId, creds) => {
+    // Poll every 5 seconds (more frequent for better UX)
     const interval = setInterval(async () => {
       try {
-        const response = await apiClient.request(`/api/deployments/${deploymentId}/status`);
+        const response = await apiClient.request(
+          `/api/deployments/${deploymentId}/status?awsAccessKeyId=${encodeURIComponent(
+            creds.awsAccessKeyId
+          )}&awsSecretAccessKey=${encodeURIComponent(
+            creds.awsSecretAccessKey
+          )}`
+        );
         const updatedDeployment = response?.data?.deployment;
         
         if (updatedDeployment) {
           setDeployment(updatedDeployment);
+          console.log('Deployment status updated:', updatedDeployment.status);
           
           // Stop polling if deployment is complete or failed
           if (updatedDeployment.status === 'complete' || 
@@ -123,12 +132,13 @@ export default function DeploymentPanel({ isOpen, onClose }) {
             clearInterval(interval);
             setPollingInterval(null);
             loadDeploymentHistory(); // Refresh history
+            setSuccess(`Deployment ${updatedDeployment.status}!`);
           }
         }
       } catch (err) {
         console.error('Status polling error:', err);
       }
-    }, 10000);
+    }, 5000);
 
     setPollingInterval(interval);
   };
@@ -169,8 +179,11 @@ export default function DeploymentPanel({ isOpen, onClose }) {
       setDeployment(deploymentData);
       setSuccess(`Deployment initiated! Stack ID: ${deploymentData?.cloudformation_stack_id}`);
       
-      // Start polling for status
-      startStatusPolling(deploymentData.id);
+      // Start polling for status - pass credentials explicitly
+      startStatusPolling(deploymentData.id, {
+        awsAccessKeyId: credentials.awsAccessKeyId,
+        awsSecretAccessKey: credentials.awsSecretAccessKey,
+      });
       
       // Clear credentials after successful deployment
       setCredentials({
@@ -189,22 +202,39 @@ export default function DeploymentPanel({ isOpen, onClose }) {
     }
   };
 
-  const handleDeleteDeployment = async (deploymentId) => {
-    if (!confirm('Are you sure you want to delete this deployment record? This will not delete the AWS stack.')) {
-      return;
-    }
-
-    try {
-      await apiClient.request(`/api/deployments/${deploymentId}`, {
-        method: 'DELETE',
-      });
-      loadDeploymentHistory();
-    } catch (err) {
-      setError(err.message || 'Failed to delete deployment');
-    }
+  const handleIAMGuideComplete = (creds) => {
+    setCredentials({
+      awsAccessKeyId: creds.accessKeyId,
+      awsSecretAccessKey: creds.secretAccessKey,
+      awsRegion: credentials.awsRegion,
+    });
+    setShowIAMGuide(false);
   };
 
-  if (!isOpen) return null;
+  // Show IAM guide when deploy modal opens if user doesn't have credentials
+  useEffect(() => {
+    if (isOpen && !credentials.awsAccessKeyId && !showIAMGuide) {
+      // Auto-open IAM guide only once when modal opens
+      const shouldShowGuide = !localStorage.getItem('iam-guide-dismissed-once');
+      if (shouldShowGuide) {
+        setShowIAMGuide(true);
+      }
+    }
+  }, [isOpen]);
+
+  if (showIAMGuide) {
+    return (
+      <IAMSetupGuide
+        onComplete={handleIAMGuideComplete}
+        onCancel={() => {
+          setShowIAMGuide(false);
+          localStorage.setItem('iam-guide-dismissed-once', 'true');
+        }}
+      />
+    );
+  }
+
+  if (!isOpen && !showIAMGuide) return null;
 
   const AWS_REGIONS = [
     { id: 'us-east-1', name: 'US East (N. Virginia)' },
@@ -274,7 +304,17 @@ export default function DeploymentPanel({ isOpen, onClose }) {
               )}
 
               <div className="form-group">
-                <label htmlFor="awsAccessKeyId">AWS Access Key ID</label>
+                <label htmlFor="awsAccessKeyId">
+                  AWS Access Key ID
+                  <button
+                    type="button"
+                    className="help-link"
+                    onClick={() => setShowIAMGuide(true)}
+                    title="Show IAM setup guide"
+                  >
+                    📖 Need Help?
+                  </button>
+                </label>
                 <input
                   type="password"
                   id="awsAccessKeyId"
@@ -372,9 +412,22 @@ export default function DeploymentPanel({ isOpen, onClose }) {
                         <p className="history-stack-id">
                           <strong>Stack:</strong> <code>{dep.cloudformation_stack_id}</code>
                         </p>
+                        <p className="history-region-detail">
+                          <strong>Region:</strong> {dep.aws_region}
+                        </p>
+                        {dep.estimated_cost && dep.estimated_cost > 0 && (
+                          <p className="history-cost">
+                            <strong>💰 Est. Cost:</strong> ${parseFloat(dep.estimated_cost).toFixed(2)}/month
+                          </p>
+                        )}
                         <p className="history-date">
                           <strong>Created:</strong> {new Date(dep.created_at).toLocaleString()}
                         </p>
+                        {dep.updated_at && dep.updated_at !== dep.created_at && (
+                          <p className="history-date">
+                            <strong>Last Updated:</strong> {new Date(dep.updated_at).toLocaleString()}
+                          </p>
+                        )}
                         {dep.completed_at && (
                           <p className="history-date">
                             <strong>Completed:</strong> {new Date(dep.completed_at).toLocaleString()}

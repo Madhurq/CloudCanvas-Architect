@@ -17,15 +17,6 @@ import PublishToMarketplace from './components/PublishToMarketplace';
 import SaveArchitectureModal from './components/SaveArchitectureModal';
 import SavedArchitecturesModal from './components/SavedArchitecturesModal';
 
-const AWS_REGIONS = [
-  { id: 'us-east-1', name: 'US East (N. Virginia)' },
-  { id: 'us-west-2', name: 'US West (Oregon)' },
-  { id: 'eu-west-1', name: 'EU (Ireland)' },
-  { id: 'eu-central-1', name: 'EU (Frankfurt)' },
-  { id: 'ap-southeast-1', name: 'Asia Pacific (Singapore)' },
-  { id: 'ap-northeast-1', name: 'Asia Pacific (Tokyo)' },
-];
-
 const PRICING_MODELS = [
   { id: 'on-demand', name: 'On-Demand', discount: 0 },
   { id: 'reserved-1yr', name: 'Reserved (1 Year)', discount: 30 },
@@ -37,8 +28,6 @@ function App() {
   const {
     showConfigModal,
     clearCanvas,
-    region,
-    setRegion,
     pricingModel,
     setPricingModel,
     exportArchitecture,
@@ -95,7 +84,7 @@ function App() {
   useEffect(() => {
     const loadPricing = async () => {
       try {
-        await initializePricing(region);
+        await initializePricing('us-east-1');
         const meta = getPricingMeta();
         setPricingStatus({ loading: false, source: meta.source });
       } catch (error) {
@@ -104,7 +93,7 @@ function App() {
       }
     };
     loadPricing();
-  }, [region]);
+  }, []);
 
   // Load architecture from URL on app startup
   useEffect(() => {
@@ -251,24 +240,8 @@ function App() {
           <span className="brand-text">CloudCanvas</span>
         </div>
 
-        {/* Region & Pricing Controls */}
+        {/* Pricing Model Control */}
         <div className="header-controls">
-          <div className="control-group">
-            <label htmlFor="region-select">Region</label>
-            <select
-              id="region-select"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className="select-input"
-            >
-              {AWS_REGIONS.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div className="control-group">
             <label htmlFor="pricing-model-select">Pricing</label>
             <select

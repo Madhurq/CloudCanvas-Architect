@@ -172,12 +172,26 @@ export const createDeployment = async (req, res) => {
 
     logger.info(`CloudFormation stack created: ${stackId}`);
 
+    // Calculate estimated monthly cost from nodes
+    let estimatedCost = 0;
+    if (Array.isArray(nodes) && nodes.length > 0) {
+      const { calculateTotalCost } = await import('../utils/costCalculator.js').catch(() => ({ calculateTotalCost: null }));
+      if (calculateTotalCost) {
+        try {
+          const costResult = calculateTotalCost(nodes, awsRegion, 'on-demand');
+          estimatedCost = costResult?.totalMonthly || 0;
+        } catch (err) {
+          logger.warn('Could not calculate estimated cost:', err.message);
+        }
+      }
+    }
+
     // Store deployment record in database
     const deploymentResult = await pool.query(
-      `INSERT INTO deployments (architecture_id, user_id, aws_region, cloudformation_stack_id, cloudformation_template, status)
-       VALUES ($1, $2, $3, $4, $5, 'creating')
-       RETURNING id, architecture_id, user_id, aws_region, status, cloudformation_stack_id, created_at`,
-      [architectureId, userId, awsRegion, stackId, templateJson]
+      `INSERT INTO deployments (architecture_id, user_id, aws_region, cloudformation_stack_id, cloudformation_template, status, estimated_cost, deployed_resources)
+       VALUES ($1, $2, $3, $4, $5, 'creating', $6, $7)
+       RETURNING id, architecture_id, user_id, aws_region, status, cloudformation_stack_id, created_at, estimated_cost`,
+      [architectureId, userId, awsRegion, stackId, templateJson, estimatedCost, JSON.stringify({ nodesCount: nodes.length, edgesCount: edges.length })]
     );
 
     const deployment = deploymentResult.rows[0];
@@ -188,6 +202,14 @@ export const createDeployment = async (req, res) => {
        VALUES ($1, $2, $3, $4)`,
       [userId, 'DEPLOYMENT_CREATED', 'deployments', deployment.id]
     );
+
+    logger.info('Deployment created and stored:', {
+      deploymentId: deployment.id,
+      architectureId,
+      stackId,
+      estimatedCost,
+      nodesCount: nodes.length,
+    });
 
     res.status(201).json(
       formatResponse(true, {
@@ -325,16 +347,20 @@ export const checkDeploymentStatus = async (req, res) => {
             newStatus = 'creating';
           }
 
-          // Update database with latest status
+          // Update database with latest status and stack information
+          const stackOutputs = stack.Outputs ? JSON.stringify(stack.Outputs) : null;
+          const deployedResourcesInfo = stack.StackStatusReason || null;
+          
           const updateResult = await pool.query(
             `UPDATE deployments 
              SET status = $1, 
                  updated_at = CURRENT_TIMESTAMP,
                  completed_at = $2,
-                 error_message = $3
-             WHERE id = $4
+                 error_message = $3,
+                 deployed_resources = $4
+             WHERE id = $5
              RETURNING *`,
-            [newStatus, completedAt, stack.StackStatusReason || null, id]
+            [newStatus, completedAt, stack.StackStatusReason || null, deployedResourcesInfo, id]
           );
 
           const updatedDeployment = updateResult.rows[0];
