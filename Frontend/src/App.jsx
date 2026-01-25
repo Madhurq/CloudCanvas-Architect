@@ -235,21 +235,14 @@ function App() {
 
         <div className="header-center">
           <div className="header-controls">
-            <div className="control-group">
-              <label htmlFor="region-select">Region:</label>
-              <select
-                id="region-select"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className="select-input"
-              >
-                {AWS_REGIONS.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Region is now set via VPC configuration */}
+            {region && (
+              <div className="control-group">
+                <span className="region-badge" title="Region is set from VPC configuration">
+                  🌍 {AWS_REGIONS.find(r => r.id === region)?.name || region}
+                </span>
+              </div>
+            )}
 
             <div className="control-group">
               <label htmlFor="pricing-model-select">Pricing:</label>
