@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { awsServices, serviceCategories } from '../data/awsServices';
+import { awsServices, serviceCategories, containerTypes } from '../data/awsServices';
 
 const ServicePalette = () => {
     const [activeCategory, setActiveCategory] = useState('compute');
@@ -11,7 +11,10 @@ const ServicePalette = () => {
         event.dataTransfer.effectAllowed = 'move';
     };
 
-    const filteredServices = Object.values(awsServices).filter((service) => {
+    // Combine regular services and container types
+    const allServices = { ...awsServices, ...containerTypes };
+
+    const filteredServices = Object.values(allServices).filter((service) => {
         if (!searchQuery) return service.category === activeCategory;
         const query = searchQuery.toLowerCase();
         return (

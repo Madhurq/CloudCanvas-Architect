@@ -45,8 +45,8 @@ export const getArchitectures = async (req, res) => {
 
     const architectures = result.rows.map(arch => ({
       ...arch,
-      nodes: JSON.parse(arch.nodes),
-      edges: JSON.parse(arch.edges),
+      nodes: typeof arch.nodes === 'string' ? JSON.parse(arch.nodes) : arch.nodes,
+      edges: typeof arch.edges === 'string' ? JSON.parse(arch.edges) : arch.edges,
     }));
 
     res.json(formatResponse(true, { architectures }));
@@ -73,8 +73,8 @@ export const getArchitecture = async (req, res) => {
     }
 
     const architecture = result.rows[0];
-    architecture.nodes = JSON.parse(architecture.nodes);
-    architecture.edges = JSON.parse(architecture.edges);
+    architecture.nodes = typeof architecture.nodes === 'string' ? JSON.parse(architecture.nodes) : architecture.nodes;
+    architecture.edges = typeof architecture.edges === 'string' ? JSON.parse(architecture.edges) : architecture.edges;
 
     res.json(formatResponse(true, { architecture }));
   } catch (error) {

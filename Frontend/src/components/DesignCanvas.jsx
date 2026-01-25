@@ -1,28 +1,32 @@
 import { useCallback } from 'react';
 import {
     ReactFlow,
+    ReactFlowProvider,
     Controls,
     Background,
     MiniMap,
     addEdge,
+    useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import useStore from '../store/useStore';
 import AWSServiceNode from './AWSServiceNode';
+import GroupNode from './GroupNode';
 import LabeledEdge from './LabeledEdge';
-import { getConnectionDefault } from '../data/awsServices';
+import { getConnectionDefault, isContainerType, containerTypes } from '../data/awsServices';
 import { validateConnection } from '../utils/connectionValidator';
 
 const nodeTypes = {
     awsService: AWSServiceNode,
+    groupNode: GroupNode,
 };
 
 const edgeTypes = {
     labeled: LabeledEdge,
 };
 
-const DesignCanvas = () => {
+const DesignCanvasInner = () => {
     const {
         nodes,
         edges,
@@ -32,6 +36,8 @@ const DesignCanvas = () => {
         setEdges,
         selectNode,
     } = useStore();
+
+    const { screenToFlowPosition, getNodes } = useReactFlow();
 
     const onConnect = useCallback((connection) => {
         const sourceNode = nodes.find(n => n.id === connection.source);
@@ -79,14 +85,66 @@ const DesignCanvas = () => {
         const serviceType = event.dataTransfer.getData('application/reactflow');
         if (!serviceType) return;
 
-        const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-        const position = {
-            x: event.clientX - reactFlowBounds.left - 100,
-            y: event.clientY - reactFlowBounds.top - 50,
+        // Convert screen position to flow position (accounts for zoom/pan)
+        const position = screenToFlowPosition({
+            x: event.clientX,
+            y: event.clientY,
+        });
+
+        // Check if drop is inside a container node (VPC, Subnet, etc.)
+        const allNodes = getNodes();
+        let parentNode = null;
+
+        // Find container nodes that contain the drop position
+        // Sort by z-index (nodes added later are on top) and check from top to bottom
+        const containerNodes = allNodes
+            .filter(node => node.type === 'groupNode' && node.data?.isContainer)
+            .reverse(); // Check topmost containers first
+
+        for (const node of containerNodes) {
+            const nodeX = node.position.x;
+            const nodeY = node.position.y;
+            // Get dimensions from style, measuredWidth/measuredHeight, or defaults
+            const nodeWidth = node.measuredWidth || node.width ||
+                (typeof node.style?.width === 'number' ? node.style.width :
+                    (node.data?.minWidth || 500));
+            const nodeHeight = node.measuredHeight || node.height ||
+                (typeof node.style?.height === 'number' ? node.style.height :
+                    (node.data?.minHeight || 350));
+
+            // Check if drop position is within container bounds
+            if (
+                position.x >= nodeX &&
+                position.x <= nodeX + nodeWidth &&
+                position.y >= nodeY &&
+                position.y <= nodeY + nodeHeight
+            ) {
+                parentNode = node;
+                break; // Use the first matching container (topmost)
+            }
+        }
+
+        // Calculate final position
+        let finalPosition = {
+            x: position.x - 100,
+            y: position.y - 50,
         };
 
-        addNode(serviceType, position);
-    }, [addNode]);
+        // If dropping inside a container, adjust position relative to parent
+        if (parentNode) {
+            const parentX = parentNode.position.x;
+            const parentY = parentNode.position.y;
+            const headerHeight = 50; // Approximate header height for VPC/container nodes
+            // Position relative to parent (account for header height)
+            // Ensure node is positioned within parent bounds
+            finalPosition = {
+                x: Math.max(10, position.x - parentX - 100), // Leave some padding from left edge
+                y: Math.max(headerHeight + 10, position.y - parentY - 50), // Below header with padding
+            };
+        }
+
+        addNode(serviceType, finalPosition, parentNode?.id || null);
+    }, [addNode, screenToFlowPosition, getNodes]);
 
     const onNodeDoubleClick = useCallback((event, node) => {
         selectNode(node.id);
@@ -115,18 +173,27 @@ const DesignCanvas = () => {
             >
                 <Background variant="dots" gap={20} size={1} color="#374151" />
                 <Controls className="flow-controls" />
-                <MiniMap
+                {/* <MiniMap
                     className="flow-minimap"
                     nodeColor={(node) => node.data?.color || '#666'}
                     maskColor="rgba(0, 0, 0, 0.8)"
-                />
+                /> */}
             </ReactFlow>
 
-            <div className="canvas-hint">
+            {/* <div className="canvas-hint">
                 <p>Drop services here • Connect by dragging handles • Double-click to configure • Invalid connections blocked</p>
-            </div>
+            </div> */}
         </div>
     );
 };
 
+// Wrapper component to provide ReactFlow context
+
+const DesignCanvas = () => (
+    <ReactFlowProvider>
+        <DesignCanvasInner />
+    </ReactFlowProvider>
+);
+
 export default DesignCanvas;
+

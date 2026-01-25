@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ServicePalette from './components/ServicePalette';
@@ -6,11 +6,14 @@ import DesignCanvas from './components/DesignCanvas';
 import CostPanel from './components/CostPanel';
 import ConfigModal from './components/ConfigModal';
 import TemplateGallery from './components/TemplateGallery';
+import DeploymentPanel from './components/DeploymentPanel';
 import useStore from './store/useStore';
 import { initializePricing, getPricingMeta } from './services/awsPricingService';
 import { downloadArchitecture, loadArchitectureFromFile, decodeArchitectureFromUrl, getShareableUrl } from './utils/exportHelper';
 import './App.css';
 import AIGeneratorModal from './components/AIGeneratorModal';
+import MarketplaceModal from './components/MarketplaceModal';
+import PublishToMarketplace from './components/PublishToMarketplace';
 
 const AWS_REGIONS = [
   { id: 'us-east-1', name: 'US East (N. Virginia)' },
@@ -45,15 +48,19 @@ function App() {
     theme,
     initializeSession,
     logout: storeLogout,
+    selectedArchitecture,
   } = useStore();
   const { user, logout: authLogout } = useAuth();
   const navigate = useNavigate();
   const [pricingStatus, setPricingStatus] = useState({ loading: true, source: null });
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
   const [shareUrlCopied, setShareUrlCopied] = useState(false);
+  const [showMarketplace, setShowMarketplace] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
   const fileInputRef = useRef(null);
 
   // Bootstrap session when tokens are present
@@ -113,6 +120,53 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  const handleExport = useCallback(() => {
+    const architecture = exportArchitecture();
+    downloadArchitecture(architecture);
+  }, [exportArchitecture]);
+
+  const handleImportClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleImportFile = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const architecture = await loadArchitectureFromFile(file);
+      importArchitecture(architecture);
+      alert('Architecture imported successfully!');
+    } catch (error) {
+      alert('Import failed: ' + error.message);
+    }
+
+    // Reset file input
+    event.target.value = '';
+  }, [importArchitecture]);
+
+  const handleShare = useCallback(() => {
+    try {
+      const architecture = exportArchitecture();
+      const url = getShareableUrl(architecture);
+      setShareUrl(url);
+      setShowShareModal(true);
+      setShareUrlCopied(false);
+    } catch (error) {
+      alert('Failed to generate share URL: ' + error.message);
+    }
+  }, [exportArchitecture]);
+
+  const handleCopyShareUrl = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareUrlCopied(true);
+      setTimeout(() => setShareUrlCopied(false), 2000);
+    } catch (error) {
+      alert('Failed to copy URL: ' + error.message);
+    }
+  }, [shareUrl]);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -165,54 +219,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteSelected, undo, redo, clearCanvas, showTemplates]);
-
-  const handleExport = () => {
-    const architecture = exportArchitecture();
-    downloadArchitecture(architecture);
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImportFile = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const architecture = await loadArchitectureFromFile(file);
-      importArchitecture(architecture);
-      alert('Architecture imported successfully!');
-    } catch (error) {
-      alert('Import failed: ' + error.message);
-    }
-
-    // Reset file input
-    event.target.value = '';
-  };
-
-  const handleShare = () => {
-    try {
-      const architecture = exportArchitecture();
-      const url = getShareableUrl(architecture);
-      setShareUrl(url);
-      setShowShareModal(true);
-      setShareUrlCopied(false);
-    } catch (error) {
-      alert('Failed to generate share URL: ' + error.message);
-    }
-  };
-
-  const handleCopyShareUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setShareUrlCopied(true);
-      setTimeout(() => setShareUrlCopied(false), 2000);
-    } catch (error) {
-      alert('Failed to copy URL: ' + error.message);
-    }
-  };
+  }, [deleteSelected, undo, redo, clearCanvas, showTemplates, handleExport]);
 
   return (
     <div className="app">
@@ -263,11 +270,20 @@ function App() {
         </div>
 
         <div className="header-right">
-        <button className="btn btn-primary" onClick={() => setShowAIModal(true)} title="Generate with AI">
+        <button className="btn btn-primary" onClick={() => setShowDeployModal(true)} title="Deploy to AWS">
+            🚀 Deploy to AWS
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowAIModal(true)} title="Generate with AI">
             ✨ AI Design
           </button>
           <button className="btn btn-ghost" onClick={() => setShowTemplates(true)} title="Load Template (Ctrl+K)">
             📋 Templates
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowMarketplace(true)} title="Browse Marketplace">
+            🛒 Marketplace
+          </button>
+          <button className="btn btn-ghost" onClick={() => setShowPublish(true)} title="Publish to Marketplace">
+            📤 Publish
           </button>
           <button className="btn btn-ghost" onClick={handleImportClick} title="Import Architecture">
             📂 Import
@@ -321,6 +337,12 @@ function App() {
       {showConfigModal && <ConfigModal />}
       <TemplateGallery isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
       <AIGeneratorModal isOpen={showAIModal} onClose={() => setShowAIModal(false)} />
+      <DeploymentPanel
+        isOpen={showDeployModal}
+        onClose={() => setShowDeployModal(false)}
+      />
+      <MarketplaceModal isOpen={showMarketplace} onClose={() => setShowMarketplace(false)} />
+      <PublishToMarketplace isOpen={showPublish} onClose={() => setShowPublish(false)} />
       {/* Share Modal */}
       {showShareModal && (
         <div className="modal-overlay" onClick={() => setShowShareModal(false)}>

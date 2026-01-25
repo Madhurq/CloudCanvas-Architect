@@ -54,6 +54,65 @@ CREATE TABLE IF NOT EXISTS pricing_cache (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (service_id, region)
 );
+
+-- Deployments table
+CREATE TABLE IF NOT EXISTS deployments (
+  id SERIAL PRIMARY KEY,
+  architecture_id INTEGER REFERENCES architectures(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  aws_region VARCHAR(100) NOT NULL,
+  status VARCHAR(50) DEFAULT 'pending',
+  cloudformation_stack_id VARCHAR(500),
+  cloudformation_template TEXT NOT NULL,
+  error_message TEXT,
+  estimated_cost NUMERIC(12,2),
+  deployed_resources TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP
+);
+
+-- Marketplace listings table
+CREATE TABLE IF NOT EXISTS marketplace_listings (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  architecture_id INTEGER REFERENCES architectures(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  category VARCHAR(100),
+  price NUMERIC(10,2) DEFAULT 0,
+  preview_image TEXT,
+  tags TEXT[],
+  downloads INTEGER DEFAULT 0,
+  rating NUMERIC(3,2) DEFAULT 0,
+  review_count INTEGER DEFAULT 0,
+  is_featured BOOLEAN DEFAULT FALSE,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(architecture_id)
+);
+
+-- Marketplace purchases table
+CREATE TABLE IF NOT EXISTS marketplace_purchases (
+  id SERIAL PRIMARY KEY,
+  listing_id INTEGER REFERENCES marketplace_listings(id) ON DELETE CASCADE,
+  buyer_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  price_paid NUMERIC(10,2) NOT NULL,
+  purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(listing_id, buyer_id)
+);
+
+-- Marketplace reviews table
+CREATE TABLE IF NOT EXISTS marketplace_reviews (
+  id SERIAL PRIMARY KEY,
+  listing_id INTEGER REFERENCES marketplace_listings(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(listing_id, user_id)
+);
 `;
 
 // Alterations for existing installations
@@ -69,6 +128,10 @@ ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 ALTER TABLE architectures ADD COLUMN IF NOT EXISTS estimated_monthly_cost NUMERIC(12,2);
 ALTER TABLE architectures ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;
 ALTER TABLE architectures ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+-- Add deployment columns if needed
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS estimated_cost NUMERIC(12,2);
+ALTER TABLE deployments ADD COLUMN IF NOT EXISTS deployed_resources TEXT;
 `;
 
 async function migrate() {
