@@ -5,12 +5,13 @@ import IAMSetupGuide from './IAMSetupGuide';
 import '../styles/DeploymentPanel.css';
 
 export default function DeploymentPanel({ isOpen, onClose }) {
-  const { selectedArchitecture, saveArchitecture, nodes, edges, region: storeRegion } = useStore();
+  const { selectedArchitecture, saveArchitecture, nodes, edges, region: storeRegion, setNodes, setEdges, setRegion } = useStore();
   const [credentials, setCredentials] = useState({
     awsAccessKeyId: '',
     awsSecretAccessKey: '',
     awsRegion: storeRegion || 'us-east-1',
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -75,7 +76,7 @@ export default function DeploymentPanel({ isOpen, onClose }) {
       if (!architectureName) {
         throw new Error('Architecture name is required');
       }
-      
+
       await saveArchitecture(architectureName);
       return useStore.getState().selectedArchitecture?.id;
     }
@@ -125,15 +126,15 @@ export default function DeploymentPanel({ isOpen, onClose }) {
           )}`
         );
         const updatedDeployment = response?.data?.deployment;
-        
+
         if (updatedDeployment) {
           setDeployment(updatedDeployment);
           console.log('Deployment status updated:', updatedDeployment.status);
-          
+
           // Stop polling if deployment is complete or failed
-          if (updatedDeployment.status === 'complete' || 
-              updatedDeployment.status === 'failed' || 
-              updatedDeployment.status === 'rolled_back') {
+          if (updatedDeployment.status === 'complete' ||
+            updatedDeployment.status === 'failed' ||
+            updatedDeployment.status === 'rolled_back') {
             clearInterval(interval);
             setPollingInterval(null);
             loadDeploymentHistory(); // Refresh history
@@ -146,6 +147,33 @@ export default function DeploymentPanel({ isOpen, onClose }) {
     }, 5000);
 
     setPollingInterval(interval);
+  };
+
+  const handleLoadDeployment = async (dep) => {
+    if (!dep.architecture_id) return;
+
+    if (nodes.length > 0 && !window.confirm('Loading this architecture will replace your current canvas. Continue?')) {
+      return;
+    }
+
+    try {
+      setLoadingHistory(true);
+      const response = await apiClient.getArchitecture(dep.architecture_id);
+      const arch = response?.data?.architecture || response?.architecture;
+
+      if (arch) {
+        setNodes(typeof arch.nodes === 'string' ? JSON.parse(arch.nodes) : (arch.nodes || []));
+        setEdges(typeof arch.edges === 'string' ? JSON.parse(arch.edges) : (arch.edges || []));
+        setRegion(arch.region);
+
+        onClose(); // Close modal on success
+      }
+    } catch (err) {
+      console.error('Failed to load architecture:', err);
+      // Optional: set error state to show in UI
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
   const handleDeploy = async () => {
@@ -183,13 +211,13 @@ export default function DeploymentPanel({ isOpen, onClose }) {
       const deploymentData = response?.data?.deployment;
       setDeployment(deploymentData);
       setSuccess(`Deployment initiated! Stack ID: ${deploymentData?.cloudformation_stack_id}`);
-      
+
       // Start polling for status - pass credentials explicitly
       startStatusPolling(deploymentData.id, {
         awsAccessKeyId: credentials.awsAccessKeyId,
         awsSecretAccessKey: credentials.awsSecretAccessKey,
       });
-      
+
       // Clear credentials after successful deployment
       setCredentials({
         awsAccessKeyId: '',
@@ -405,13 +433,23 @@ export default function DeploymentPanel({ isOpen, onClose }) {
                           {getStatusBadge(dep.status)}
                           <span className="history-region">{dep.aws_region}</span>
                         </div>
-                        <button
-                          className="btn-icon btn-delete"
-                          onClick={() => handleDeleteDeployment(dep.id)}
-                          title="Delete deployment record"
-                        >
-                          🗑️
-                        </button>
+                        <div className="history-actions" style={{ display: 'flex' }}>
+                          <button
+                            className="btn-icon btn-load"
+                            onClick={() => handleLoadDeployment(dep)}
+                            title="Load this architecture"
+                            style={{ marginRight: '8px', fontSize: '1.2rem', background: 'none', border: 'none', cursor: 'pointer' }}
+                          >
+                            📥
+                          </button>
+                          <button
+                            className="btn-icon btn-delete"
+                            onClick={() => handleDeleteDeployment(dep.id)}
+                            title="Delete deployment record"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                       <div className="history-details">
                         <p className="history-stack-id">
