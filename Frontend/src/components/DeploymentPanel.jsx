@@ -45,14 +45,19 @@ export default function DeploymentPanel({ isOpen, onClose }) {
   }, [pollingInterval]);
 
   const loadDeploymentHistory = async () => {
-    if (!selectedArchitecture?.id) return;
-    
     setLoadingHistory(true);
     try {
-      const response = await apiClient.request(`/api/deployments/architecture/${selectedArchitecture.id}`);
+      let response;
+      if (selectedArchitecture?.id) {
+        response = await apiClient.request(`/api/deployments/architecture/${selectedArchitecture.id}`);
+      } else {
+        // Fallback: load all user deployments when no architecture is selected (e.g., after refresh)
+        response = await apiClient.request(`/api/deployments/user`);
+      }
       setDeploymentHistory(response?.data?.deployments || []);
     } catch (err) {
       console.error('Failed to load deployment history:', err);
+      setDeploymentHistory([]);
     } finally {
       setLoadingHistory(false);
     }

@@ -292,6 +292,28 @@ export const getDeploymentsByArchitecture = async (req, res) => {
 };
 
 /**
+ * Get all deployments for the authenticated user (any architecture)
+ */
+export const getDeploymentsForUser = async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT * FROM deployments
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    const deployments = result.rows;
+    res.json(formatResponse(true, { deployments }));
+  } catch (error) {
+    logger.error('Get user deployments error:', error);
+    res.status(500).json(formatResponse(false, null, 'Failed to fetch deployments'));
+  }
+};
+
+/**
  * Poll deployment status from CloudFormation
  * Fetches real-time status from AWS and updates database
  */
