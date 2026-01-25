@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import useStore from '../store/useStore';
 import '../styles/IAMSetupGuide.css';
 
 export default function IAMSetupGuide({ onComplete, onCancel }) {
+  const { nodes } = useStore();
   const [currentStep, setCurrentStep] = useState(0);
   const [credentials, setCredentials] = useState({
     accessKeyId: '',
@@ -46,38 +48,28 @@ export default function IAMSetupGuide({ onComplete, onCancel }) {
       action: 'User Created',
     },
     {
-      title: 'Set IAM Permissions',
-      description: 'Grant the user permissions to deploy CloudFormation stacks:',
+      title: 'Set IAM Permissions (Least Privilege)',
+      description: 'Grant only the minimal permissions needed to deploy stacks based on the services in your design.',
       details: (
         <div>
           <ol className="steps-list">
             <li>
-              <strong>On Permissions Page:</strong> Select "Attach policies directly"
+              <strong>On Permissions Page:</strong> Select "Attach policies directly".
             </li>
             <li>
-              <strong>Search for Policies:</strong> In the search box, type <code>CloudFormationFullAccess</code>
+              <strong>Attach CloudFormation stack ops:</strong> Use the AWS managed policy <code>AWSCloudFormationFullAccess</code> (preferred over broad PowerUser).
             </li>
             <li>
-              <strong>Select Policy:</strong> Check the box next to <code>CloudFormationFullAccess</code>
-            </li>
-            <li>
-              <strong>Add More Policies (Recommended):</strong> Also search and add:
-              <div className="policy-list">
-                <span className="policy-tag">CloudFormationReadOnlyAccess</span>
-                <span className="policy-tag">EC2FullAccess</span>
-                <span className="policy-tag">RDSFullAccess</span>
-                <span className="policy-tag">S3FullAccess</span>
-                <span className="policy-tag">ElastiCacheFullAccess</span>
-              </div>
-              <p className="hint">💡 <strong>Tip:</strong> For production, create a custom policy with minimal permissions. See IAM_PERMISSIONS_FIX.md for details.</p>
-            </li>
-            <li>
-              <strong>Click Next:</strong> Review and create user
-            </li>
-            <li>
-              <strong>Click Create User:</strong> Your user is now created!
+              <strong>Attach service-scoped permissions:</strong> Add policies only for services present in your canvas (e.g., EC2, S3, RDS, ALB, Lambda). For tighter control, use the custom policy below.
             </li>
           </ol>
+
+          {/* Dynamic least-privilege policy generator */}
+          <LeastPrivilegePolicy nodes={nodes} />
+
+          <p className="hint">
+            💡 <strong>Tip:</strong> Scope <code>Resource</code> to specific ARNs in production and restrict <code>iam:PassRole</code> with conditions. See IAM_PERMISSIONS_FIX.md for more examples.
+          </p>
         </div>
       ),
       action: 'Permissions Set',
@@ -299,6 +291,110 @@ export default function IAMSetupGuide({ onComplete, onCancel }) {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Helper component: generate a least-privilege policy based on current nodes
+function LeastPrivilegePolicy({ nodes }) {
+  const serviceActions = useMemo(() => {
+    const actions = new Set([
+      'cloudformation:CreateStack',
+      'cloudformation:UpdateStack',
+      'cloudformation:DescribeStacks',
+      'cloudformation:DeleteStack',
+      'cloudformation:ListStacks',
+    ]);
+
+    const has = (type) => nodes?.some(n => n?.data?.serviceType === type);
+
+    // Networking and compute
+    if (has('vpc') || has('subnet_public') || has('subnet_private') || has('security_group') || has('ec2') || has('alb') || has('nlb')) {
+      [
+        'ec2:CreateVpc','ec2:DeleteVpc','ec2:CreateSubnet','ec2:DeleteSubnet',
+        'ec2:CreateSecurityGroup','ec2:DeleteSecurityGroup','ec2:AuthorizeSecurityGroupIngress','ec2:AuthorizeSecurityGroupEgress',
+        'ec2:RunInstances','ec2:TerminateInstances','ec2:CreateTags','ec2:DeleteTags',
+        'ec2:Describe*'
+      ].forEach(a => actions.add(a));
+      ['elasticloadbalancing:CreateLoadBalancer','elasticloadbalancing:DeleteLoadBalancer','elasticloadbalancing:CreateTargetGroup','elasticloadbalancing:DeleteTargetGroup','elasticloadbalancing:RegisterTargets','elasticloadbalancing:Describe*'].forEach(a => actions.add(a));
+    }
+
+    // Databases
+    if (has('rds') || has('aurora')) {
+      ['rds:CreateDBInstance','rds:DeleteDBInstance','rds:ModifyDBInstance','rds:Describe*','rds:AddTagsToResource'].forEach(a => actions.add(a));
+    }
+    if (has('elasticache')) {
+      ['elasticache:CreateCacheCluster','elasticache:DeleteCacheCluster','elasticache:Describe*','elasticache:AddTagsToResource'].forEach(a => actions.add(a));
+    }
+
+    // Storage
+    if (has('s3')) {
+      ['s3:CreateBucket','s3:DeleteBucket','s3:PutBucketPolicy','s3:PutBucketPublicAccessBlock','s3:PutObject','s3:GetObject','s3:DeleteObject','s3:GetBucketLocation'].forEach(a => actions.add(a));
+    }
+
+    // Lambda
+    if (has('lambda')) {
+      ['lambda:CreateFunction','lambda:DeleteFunction','lambda:UpdateFunctionConfiguration','lambda:UpdateFunctionCode','lambda:InvokeFunction','lambda:GetFunction','lambda:ListFunctions'].forEach(a => actions.add(a));
+      // PassRole is required when CloudFormation assigns execution roles
+      actions.add('iam:PassRole');
+      actions.add('iam:GetRole');
+    }
+
+    // Observability
+    ['logs:CreateLogGroup','logs:CreateLogStream','logs:PutLogEvents','logs:Describe*','cloudwatch:PutMetricData','cloudwatch:Describe*'].forEach(a => actions.add(a));
+
+    return Array.from(actions).sort();
+  }, [nodes]);
+
+  const policyDoc = useMemo(() => ({
+    Version: '2012-10-17',
+    Statement: [
+      {
+        Sid: 'CloudFormationStackOps',
+        Effect: 'Allow',
+        Action: [
+          'cloudformation:CreateStack',
+          'cloudformation:UpdateStack',
+          'cloudformation:DescribeStacks',
+          'cloudformation:DeleteStack',
+          'cloudformation:ListStacks',
+        ],
+        Resource: '*'
+      },
+      {
+        Sid: 'ServiceScopedActions',
+        Effect: 'Allow',
+        Action: serviceActions,
+        Resource: '*'
+      },
+      {
+        Sid: 'RestrictPassRole',
+        Effect: 'Allow',
+        Action: ['iam:PassRole'],
+        Resource: '*',
+        Condition: {
+          StringEquals: {
+            'iam:PassedToService': ['lambda.amazonaws.com','ec2.amazonaws.com']
+          }
+        }
+      }
+    ]
+  }), [serviceActions]);
+
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <div className="policy-block">
+      <p><strong>Custom Policy (copy & paste):</strong></p>
+      <pre className="policy-json">{JSON.stringify(policyDoc, null, 2)}</pre>
+      <button
+        className="btn btn-secondary"
+        onClick={() => {
+          navigator.clipboard.writeText(JSON.stringify(policyDoc, null, 2));
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+      >{copied ? '✓ Copied' : 'Copy Policy'}</button>
     </div>
   );
 }
