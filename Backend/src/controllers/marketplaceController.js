@@ -339,17 +339,43 @@ export const addReview = async (req, res) => {
       WHERE listing_id = $1
     `, [id]);
 
+    const avgRating = avgResult.rows[0].avg_rating || 0;
+    const reviewCount = avgResult.rows[0].review_count || 0;
+
     await pool.query(`
       UPDATE marketplace_listings 
       SET rating = $2, review_count = $3 
       WHERE id = $1
-    `, [id, avgResult.rows[0].avg_rating, avgResult.rows[0].review_count]);
+    `, [id, avgRating, reviewCount]);
 
     logger.info(`User ${userId} reviewed listing ${id}`);
     res.json(formatResponse(true, { message: 'Review added successfully' }));
   } catch (error) {
     logger.error('Add review error:', error);
     res.status(500).json(formatResponse(false, null, 'Failed to add review'));
+  }
+};
+
+// Get reviews for a listing (public)
+export const getReviews = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query(`
+      SELECT 
+        mr.id, mr.listing_id, mr.rating, mr.comment, mr.created_at,
+        u.first_name, u.last_name, u.email,
+        CONCAT(u.first_name, ' ', u.last_name) as user_name
+      FROM marketplace_reviews mr
+      JOIN users u ON mr.user_id = u.id
+      WHERE mr.listing_id = $1
+      ORDER BY mr.created_at DESC
+    `, [id]);
+
+    res.json(formatResponse(true, { reviews: result.rows }));
+  } catch (error) {
+    logger.error('Get reviews error:', error);
+    res.status(500).json(formatResponse(false, null, 'Failed to fetch reviews'));
   }
 };
 

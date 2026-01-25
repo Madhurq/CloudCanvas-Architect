@@ -9,6 +9,11 @@ const MarketplaceModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [selectedListing, setSelectedListing] = useState(null);
   const [filter, setFilter] = useState({ category: '', search: '', sortBy: 'created_at' });
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const { importArchitecture, accessToken } = useStore();
 
   const fetchListings = useCallback(async () => {
@@ -45,9 +50,29 @@ const MarketplaceModal = ({ isOpen, onClose }) => {
       
       if (data.success) {
         setSelectedListing(data.data.listing);
+        // Fetch reviews for this listing
+        await fetchReviews(listingId);
       }
     } catch (error) {
       console.error('Failed to fetch listing details:', error);
+    }
+  };
+
+  const fetchReviews = async (listingId) => {
+    try {
+      setReviewsLoading(true);
+      const response = await fetch(`${API_BASE}/api/marketplace/${listingId}/reviews`);
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('Reviews data:', data.data.reviews); // Debug log
+        setReviews(data.data.reviews || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch reviews:', error);
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
     }
   };
 
@@ -84,6 +109,50 @@ const MarketplaceModal = ({ isOpen, onClose }) => {
     } catch (error) {
       console.error('Purchase error:', error);
       alert('Purchase failed. Please try again.');
+    }
+  };
+
+  const handleSubmitReview = async (listingId) => {
+    if (!accessToken) {
+      alert('Please login to submit a review');
+      return;
+    }
+
+    if (!reviewData.rating) {
+      alert('Please select a rating');
+      return;
+    }
+
+    try {
+      setReviewLoading(true);
+      const response = await fetch(`${API_BASE}/api/marketplace/${listingId}/review`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rating: parseInt(reviewData.rating),
+          comment: reviewData.comment.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('✅ Review submitted successfully!');
+        setReviewData({ rating: 5, comment: '' });
+        setShowReviewForm(false);
+        // Refresh listing details and reviews
+        await handleViewDetails(listingId);
+      } else {
+        alert(data.error || 'Failed to submit review. Make sure you purchased this architecture first.');
+      }
+    } catch (error) {
+      console.error('Review submission error:', error);
+      alert('Failed to submit review. Please try again.');
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -146,7 +215,7 @@ const MarketplaceModal = ({ isOpen, onClose }) => {
               <div className="listing-detail-header">
                 <h3>{selectedListing.title}</h3>
                 <div className="listing-meta">
-                  <span>⭐ {typeof selectedListing.rating === 'number' ? selectedListing.rating.toFixed(1) : 'N/A'} ({selectedListing.review_count || 0} reviews)</span>
+                  <span>⭐ {selectedListing.rating && Number(selectedListing.rating) > 0 ? Number(selectedListing.rating).toFixed(1) : 'N/A'} ({selectedListing.review_count || 0} reviews)</span>
                   <span>📥 {selectedListing.downloads} downloads</span>
                   <span className="listing-price">${selectedListing.price === 0 ? 'FREE' : selectedListing.price}</span>
                 </div>
@@ -175,6 +244,119 @@ const MarketplaceModal = ({ isOpen, onClose }) => {
                 >
                   {selectedListing.price === 0 ? 'Get for Free' : `Purchase for $${selectedListing.price}`}
                 </button>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => setShowReviewForm(!showReviewForm)}
+                  style={{ marginLeft: '10px' }}
+                >
+                  {showReviewForm ? '✕ Hide Review' : '✍️ Write a Review'}
+                </button>
+              </div>
+
+              {/* Review Form */}
+              {showReviewForm && (
+                <div className="review-form-container">
+                  <h4>📝 Leave a Review</h4>
+                  <p className="review-note">Share your feedback about this architecture</p>
+                  
+                  <div className="form-group">
+                    <label htmlFor="rating-select">Rating *</label>
+                    <select
+                      id="rating-select"
+                      className="rating-select"
+                      value={reviewData.rating}
+                      onChange={(e) => setReviewData({ ...reviewData, rating: e.target.value })}
+                    >
+                      <option value="">-- Select Rating --</option>
+                      <option value="1">⭐ 1 - Poor</option>
+                      <option value="2">⭐⭐ 2 - Fair</option>
+                      <option value="3">⭐⭐⭐ 3 - Good</option>
+                      <option value="4">⭐⭐⭐⭐ 4 - Very Good</option>
+                      <option value="5">⭐⭐⭐⭐⭐ 5 - Excellent</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="comment-textarea">Comment (Optional)</label>
+                    <textarea
+                      id="comment-textarea"
+                      className="comment-textarea"
+                      placeholder="Share your experience... What did you like? Any suggestions?"
+                      value={reviewData.comment}
+                      onChange={(e) => setReviewData({ ...reviewData, comment: e.target.value })}
+                      rows="4"
+                      maxLength="500"
+                    />
+                    <small className="char-count">
+                      {reviewData.comment.length}/500 characters
+                    </small>
+                  </div>
+
+                  <div className="review-actions">
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => handleSubmitReview(selectedListing.id)}
+                      disabled={reviewLoading || !reviewData.rating}
+                    >
+                      {reviewLoading ? '⏳ Submitting...' : '✓ Submit Review'}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setShowReviewForm(false);
+                        setReviewData({ rating: 5, comment: '' });
+                      }}
+                      disabled={reviewLoading}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Reviews List */}
+              <div className="reviews-section">
+                <h4 className="reviews-title">📋 User Reviews ({selectedListing.review_count || 0})</h4>
+                
+                {reviewsLoading ? (
+                  <div className="reviews-loading">Loading reviews...</div>
+                ) : reviews.length === 0 ? (
+                  <div className="no-reviews">
+                    <p>No reviews yet. Be the first to share your feedback!</p>
+                  </div>
+                ) : (
+                  <div className="reviews-list">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="review-item">
+                        <div className="review-header">
+                          <div className="review-rating">
+                            <span className="stars">
+                              {'⭐'.repeat(review.rating)}
+                            </span>
+                            <span className="rating-value">{review.rating}/5</span>
+                          </div>
+                          <div className="review-meta">
+                            <span className="reviewer-name">
+                              {(() => {
+                                const fullName = review.user_name?.trim();
+                                if (fullName && fullName.length > 0) return fullName;
+                                if (review.first_name && review.last_name) return `${review.first_name} ${review.last_name}`;
+                                if (review.email) return review.email.split('@')[0];
+                                return 'Anonymous User';
+                              })()}
+                            </span>
+                            <span className="review-date">
+                              {new Date(review.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        {review.comment && (
+                          <p className="review-comment">{review.comment}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -190,7 +372,7 @@ const MarketplaceModal = ({ isOpen, onClose }) => {
                     </div>
                     <p className="card-description">{(listing.description || '').slice(0, 100)}...</p>
                     <div className="card-meta">
-                      <span>⭐ {typeof listing.rating === 'number' ? listing.rating.toFixed(1) : 'N/A'}</span>
+                      <span>⭐ {listing.rating && Number(listing.rating) > 0 ? Number(listing.rating).toFixed(1) : 'N/A'} ({listing.review_count || 0})</span>
                       <span>📥 {listing.downloads}</span>
                       <span className="card-category">{listing.category}</span>
                     </div>
