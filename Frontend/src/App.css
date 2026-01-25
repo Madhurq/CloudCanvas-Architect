@@ -497,7 +497,7 @@ body {
 .app-main {
   flex: 1;
   display: grid;
-  grid-template-columns: 200px 1fr 240px;
+  grid-template-columns: 260px 1fr 300px;
   gap: 0;
   overflow: hidden;
   min-height: 0;
@@ -509,6 +509,31 @@ body {
   border-right: 1px solid var(--border-color);
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-primary) transparent;
+}
+
+/* Webkit browsers scrollbar styling */
+.sidebar-left::-webkit-scrollbar,
+.sidebar-right::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-left::-webkit-scrollbar-track,
+.sidebar-right::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-left::-webkit-scrollbar-thumb,
+.sidebar-right::-webkit-scrollbar-thumb {
+  background: var(--accent-primary);
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.sidebar-left::-webkit-scrollbar-thumb:hover,
+.sidebar-right::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-secondary);
 }
 
 .sidebar-right {
@@ -525,13 +550,13 @@ body {
 /* Responsive sidebar widths */
 @media (max-width: 1280px) {
   .app-main {
-    grid-template-columns: 180px 1fr 220px;
+    grid-template-columns: 240px 1fr 280px;
   }
 }
 
 @media (max-width: 1024px) {
   .app-main {
-    grid-template-columns: 160px 1fr 200px;
+    grid-template-columns: 220px 1fr 260px;
   }
 }
 

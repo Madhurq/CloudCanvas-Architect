@@ -97,6 +97,28 @@ export const awsServices = {
     defaultPorts: { inbound: [443], outbound: [443, 5432] }
   },
 
+  ecr: {
+    id: 'ecr',
+    name: 'ECR (Container Registry)',
+    category: 'compute',
+    color: '#FF9900',
+    icon: '📦',
+    useCase: 'Docker container image registry for ECS/EKS',
+    whenToUse: 'Store, manage and deploy Docker container images',
+    defaultConfig: {
+      repositories: 10,
+      storageGB: 50,
+      scanOnPush: true
+    },
+    configFields: [
+      { key: 'repositories', label: 'Number of Repositories', type: 'number', min: 1, max: 1000 },
+      { key: 'storageGB', label: 'Storage (GB)', type: 'number', min: 1, max: 10000 },
+      { key: 'scanOnPush', label: 'Scan on Push', type: 'boolean' }
+    ],
+    allowedConnections: ['ecs', 'eks', 'lambda', 'apprunner'],
+    defaultPorts: { inbound: [443], outbound: [] }
+  },
+
   // ==================== STORAGE ====================
   s3: {
     id: 's3',
@@ -415,6 +437,26 @@ export const awsServices = {
     defaultPorts: { inbound: [443], outbound: [] }
   },
 
+  stepfunctions: {
+    id: 'stepfunctions',
+    name: 'Step Functions',
+    category: 'messaging',
+    color: '#FF4F8B',
+    icon: '🔀',
+    useCase: 'Serverless workflow orchestration for multi-step processes',
+    whenToUse: 'Coordinate Lambda functions, human approval, error handling',
+    defaultConfig: {
+      stateTransitions: 10000,
+      workflowType: 'standard'
+    },
+    configFields: [
+      { key: 'stateTransitions', label: 'State Transitions/Month', type: 'number', min: 0, max: 100000000 },
+      { key: 'workflowType', label: 'Workflow Type', type: 'select', options: ['standard', 'express'] }
+    ],
+    allowedConnections: ['lambda', 'sqs', 'sns', 'dynamodb', 's3'],
+    defaultPorts: { inbound: [443], outbound: [443] }
+  },
+
   // ==================== SECURITY ====================
   waf: {
     id: 'waf',
@@ -479,6 +521,30 @@ export const awsServices = {
   },
 
   // ==================== ANALYTICS ====================
+  cloudwatch: {
+    id: 'cloudwatch',
+    name: 'CloudWatch',
+    category: 'analytics',
+    color: '#A166FF',
+    icon: '📈',
+    useCase: 'Monitoring, logging, and observability for AWS resources',
+    whenToUse: 'Metrics, logs, alarms, dashboards, performance monitoring',
+    defaultConfig: {
+      metricsPerMonth: 10000,
+      logsGB: 50,
+      dashboards: 5,
+      alarms: 20
+    },
+    configFields: [
+      { key: 'metricsPerMonth', label: 'Custom Metrics/Month', type: 'number', min: 0, max: 1000000 },
+      { key: 'logsGB', label: 'Logs Ingested (GB)', type: 'number', min: 0, max: 100000 },
+      { key: 'dashboards', label: 'Dashboards', type: 'number', min: 0, max: 100 },
+      { key: 'alarms', label: 'Alarms', type: 'number', min: 0, max: 5000 }
+    ],
+    allowedConnections: ['sns', 'lambda'],
+    defaultPorts: { inbound: [], outbound: [443] }
+  },
+
   kinesis: {
     id: 'kinesis',
     name: 'Kinesis Data Streams',
@@ -859,6 +925,349 @@ export const awsServices = {
     ],
     allowedConnections: ['cloudfront', 'alb', 'apigateway'],
     defaultPorts: { inbound: [443], outbound: [443] }
+  },
+
+  kms: {
+    id: 'kms',
+    name: 'KMS (Key Management)',
+    category: 'security',
+    color: '#DD344C',
+    icon: '🔑',
+    useCase: 'Create and manage encryption keys for data protection',
+    whenToUse: 'Encrypt data at rest/transit, compliance, key rotation',
+    defaultConfig: {
+      customerManagedKeys: 5,
+      requestsPerMonth: 10000
+    },
+    configFields: [
+      { key: 'customerManagedKeys', label: 'Customer Managed Keys', type: 'number', min: 0, max: 1000 },
+      { key: 'requestsPerMonth', label: 'API Requests/Month', type: 'number', min: 0, max: 100000000 }
+    ],
+    allowedConnections: ['s3', 'rds', 'dynamodb', 'ebs'],
+    defaultPorts: { inbound: [], outbound: [] }
+  },
+
+  iam: {
+    id: 'iam',
+    name: 'IAM',
+    category: 'security',
+    color: '#DD344C',
+    icon: '👥',
+    useCase: 'Identity and access management for AWS resources',
+    whenToUse: 'User permissions, roles, policies, service access control',
+    defaultConfig: {
+      users: 50,
+      roles: 20,
+      policies: 30
+    },
+    configFields: [
+      { key: 'users', label: 'IAM Users', type: 'number', min: 0, max: 5000 },
+      { key: 'roles', label: 'IAM Roles', type: 'number', min: 0, max: 1000 },
+      { key: 'policies', label: 'Custom Policies', type: 'number', min: 0, max: 5000 }
+    ],
+    allowedConnections: [],
+    defaultPorts: { inbound: [], outbound: [] }
+  },
+
+  shield: {
+    id: 'shield',
+    name: 'AWS Shield',
+    category: 'security',
+    color: '#DD344C',
+    icon: '🛡️',
+    useCase: 'DDoS protection for AWS applications',
+    whenToUse: 'Production workloads, always-on DDoS mitigation',
+    defaultConfig: {
+      tier: 'standard',
+      protectedResources: 5
+    },
+    configFields: [
+      { key: 'tier', label: 'Shield Tier', type: 'select', options: ['standard', 'advanced'] },
+      { key: 'protectedResources', label: 'Protected Resources', type: 'number', min: 1, max: 1000 }
+    ],
+    allowedConnections: ['cloudfront', 'alb', 'route53'],
+    defaultPorts: { inbound: [], outbound: [] }
+  },
+
+  // ==================== AI/ML SERVICES ====================
+  sagemaker: {
+    id: 'sagemaker',
+    name: 'SageMaker',
+    category: 'analytics',
+    color: '#A166FF',
+    icon: '🤖',
+    useCase: 'Build, train, and deploy machine learning models',
+    whenToUse: 'Custom ML models, training, inference endpoints',
+    defaultConfig: {
+      notebookInstanceType: 'ml.t3.medium',
+      trainingHours: 100,
+      endpointInstanceType: 'ml.t2.medium',
+      endpointHours: 730
+    },
+    configFields: [
+      { key: 'notebookInstanceType', label: 'Notebook Instance', type: 'select', options: ['ml.t3.medium', 'ml.t3.large', 'ml.m5.large', 'ml.p3.2xlarge'] },
+      { key: 'trainingHours', label: 'Training Hours/Month', type: 'number', min: 0, max: 10000 },
+      { key: 'endpointInstanceType', label: 'Endpoint Instance', type: 'select', options: ['ml.t2.medium', 'ml.m5.large', 'ml.c5.xlarge', 'ml.g4dn.xlarge'] },
+      { key: 'endpointHours', label: 'Endpoint Hours/Month', type: 'number', min: 0, max: 730 }
+    ],
+    allowedConnections: ['s3', 'ecr', 'dynamodb'],
+    defaultPorts: { inbound: [443], outbound: [443] }
+  },
+
+  bedrock: {
+    id: 'bedrock',
+    name: 'Bedrock (Gen AI)',
+    category: 'analytics',
+    color: '#A166FF',
+    icon: '✨',
+    useCase: 'Access foundation models for generative AI applications',
+    whenToUse: 'ChatGPT-like apps, text generation, image generation',
+    defaultConfig: {
+      model: 'claude-v2',
+      inputTokensMillions: 1,
+      outputTokensMillions: 0.5
+    },
+    configFields: [
+      { key: 'model', label: 'Foundation Model', type: 'select', options: ['claude-v2', 'claude-instant', 'titan-text', 'llama2', 'stable-diffusion'] },
+      { key: 'inputTokensMillions', label: 'Input Tokens (M)', type: 'number', min: 0, max: 1000 },
+      { key: 'outputTokensMillions', label: 'Output Tokens (M)', type: 'number', min: 0, max: 1000 }
+    ],
+    allowedConnections: ['lambda', 'apigateway', 's3'],
+    defaultPorts: { inbound: [443], outbound: [443] }
+  },
+
+  // ==================== DEVOPS/CI-CD ====================
+  codepipeline: {
+    id: 'codepipeline',
+    name: 'CodePipeline',
+    category: 'compute',
+    color: '#FF9900',
+    icon: '🔄',
+    useCase: 'Continuous delivery pipeline for automated releases',
+    whenToUse: 'CI/CD automation, multi-stage deployments',
+    defaultConfig: {
+      pipelinesActive: 5,
+      executionsPerMonth: 100
+    },
+    configFields: [
+      { key: 'pipelinesActive', label: 'Active Pipelines', type: 'number', min: 1, max: 300 },
+      { key: 'executionsPerMonth', label: 'Executions/Month', type: 'number', min: 0, max: 10000 }
+    ],
+    allowedConnections: ['codebuild', 'codedeploy', 's3', 'ecr'],
+    defaultPorts: { inbound: [], outbound: [443] }
+  },
+
+  codebuild: {
+    id: 'codebuild',
+    name: 'CodeBuild',
+    category: 'compute',
+    color: '#FF9900',
+    icon: '🏗️',
+    useCase: 'Fully managed build service for compiling and testing',
+    whenToUse: 'Compile code, run tests, produce deployable artifacts',
+    defaultConfig: {
+      computeType: 'BUILD_GENERAL1_SMALL',
+      buildMinutesPerMonth: 500
+    },
+    configFields: [
+      { key: 'computeType', label: 'Compute Type', type: 'select', options: ['BUILD_GENERAL1_SMALL', 'BUILD_GENERAL1_MEDIUM', 'BUILD_GENERAL1_LARGE'] },
+      { key: 'buildMinutesPerMonth', label: 'Build Minutes/Month', type: 'number', min: 0, max: 100000 }
+    ],
+    allowedConnections: ['s3', 'ecr', 'codepipeline'],
+    defaultPorts: { inbound: [], outbound: [443] }
+  },
+
+  codedeploy: {
+    id: 'codedeploy',
+    name: 'CodeDeploy',
+    category: 'compute',
+    color: '#FF9900',
+    icon: '🚀',
+    useCase: 'Automate deployments to EC2, Lambda, or ECS',
+    whenToUse: 'Blue/green deployments, rolling updates, canary releases',
+    defaultConfig: {
+      deploymentsPerMonth: 50,
+      onPremiseInstances: 0
+    },
+    configFields: [
+      { key: 'deploymentsPerMonth', label: 'Deployments/Month', type: 'number', min: 0, max: 10000 },
+      { key: 'onPremiseInstances', label: 'On-Premise Instances', type: 'number', min: 0, max: 1000 }
+    ],
+    allowedConnections: ['ec2', 'ecs', 'lambda', 's3'],
+    defaultPorts: { inbound: [], outbound: [443] }
+  },
+
+  // ==================== ADDITIONAL DATABASES ====================
+  documentdb: {
+    id: 'documentdb',
+    name: 'DocumentDB',
+    category: 'database',
+    color: '#3B48CC',
+    icon: '📄',
+    useCase: 'MongoDB-compatible document database',
+    whenToUse: 'MongoDB workloads, document-oriented data, JSON storage',
+    defaultConfig: {
+      instanceClass: 'db.t3.medium',
+      instanceCount: 1,
+      storageGB: 100
+    },
+    configFields: [
+      { key: 'instanceClass', label: 'Instance Class', type: 'select', options: ['db.t3.medium', 'db.r5.large', 'db.r5.xlarge', 'db.r5.2xlarge'] },
+      { key: 'instanceCount', label: 'Instance Count', type: 'number', min: 1, max: 16 },
+      { key: 'storageGB', label: 'Storage (GB)', type: 'number', min: 10, max: 64000 }
+    ],
+    allowedConnections: [],
+    defaultPorts: { inbound: [27017], outbound: [] }
+  },
+
+  neptune: {
+    id: 'neptune',
+    name: 'Neptune',
+    category: 'database',
+    color: '#3B48CC',
+    icon: '🔗',
+    useCase: 'Fully managed graph database for connected data',
+    whenToUse: 'Social networks, recommendation engines, fraud detection',
+    defaultConfig: {
+      instanceClass: 'db.t3.medium',
+      instanceCount: 1,
+      storageGB: 100
+    },
+    configFields: [
+      { key: 'instanceClass', label: 'Instance Class', type: 'select', options: ['db.t3.medium', 'db.r5.large', 'db.r5.xlarge'] },
+      { key: 'instanceCount', label: 'Instance Count', type: 'number', min: 1, max: 16 },
+      { key: 'storageGB', label: 'Storage (GB)', type: 'number', min: 10, max: 64000 }
+    ],
+    allowedConnections: [],
+    defaultPorts: { inbound: [8182], outbound: [] }
+  },
+
+  memorydb: {
+    id: 'memorydb',
+    name: 'MemoryDB for Redis',
+    category: 'database',
+    color: '#C925D1',
+    icon: '⚡',
+    useCase: 'Redis-compatible, durable, in-memory database',
+    whenToUse: 'Microsecond latency with data durability, real-time apps',
+    defaultConfig: {
+      nodeType: 'db.t4g.small',
+      numShards: 1,
+      replicasPerShard: 1
+    },
+    configFields: [
+      { key: 'nodeType', label: 'Node Type', type: 'select', options: ['db.t4g.small', 'db.t4g.medium', 'db.r6g.large', 'db.r6g.xlarge'] },
+      { key: 'numShards', label: 'Number of Shards', type: 'number', min: 1, max: 500 },
+      { key: 'replicasPerShard', label: 'Replicas per Shard', type: 'number', min: 0, max: 5 }
+    ],
+    allowedConnections: [],
+    defaultPorts: { inbound: [6379], outbound: [] }
+  },
+
+  // ==================== ADVANCED NETWORKING ====================
+  transitgateway: {
+    id: 'transitgateway',
+    name: 'Transit Gateway',
+    category: 'networking',
+    color: '#8C4FFF',
+    icon: '🔀',
+    useCase: 'Connect VPCs and on-premises networks through a central hub',
+    whenToUse: 'Multi-VPC architectures, hybrid cloud, hub-and-spoke',
+    defaultConfig: {
+      attachments: 5,
+      dataProcessedGB: 1000
+    },
+    configFields: [
+      { key: 'attachments', label: 'VPC Attachments', type: 'number', min: 1, max: 5000 },
+      { key: 'dataProcessedGB', label: 'Data Processed (GB)', type: 'number', min: 0, max: 1000000 }
+    ],
+    allowedConnections: ['vpc'],
+    defaultPorts: { inbound: [], outbound: [] }
+  },
+
+  appsync: {
+    id: 'appsync',
+    name: 'AppSync (GraphQL)',
+    category: 'networking',
+    color: '#8C4FFF',
+    icon: '📊',
+    useCase: 'Managed GraphQL API with real-time subscriptions',
+    whenToUse: 'GraphQL APIs, real-time data sync, mobile/web backends',
+    defaultConfig: {
+      queriesPerMonth: 1000000,
+      realTimeUpdates: true
+    },
+    configFields: [
+      { key: 'queriesPerMonth', label: 'Queries/Month', type: 'number', min: 0, max: 1000000000 },
+      { key: 'realTimeUpdates', label: 'Real-time Updates', type: 'boolean' }
+    ],
+    allowedConnections: ['dynamodb', 'lambda', 'rds', 'opensearch'],
+    defaultPorts: { inbound: [443], outbound: [443] }
+  },
+
+  directconnect: {
+    id: 'directconnect',
+    name: 'Direct Connect',
+    category: 'networking',
+    color: '#8C4FFF',
+    icon: '🔌',
+    useCase: 'Dedicated network connection from on-premises to AWS',
+    whenToUse: 'Hybrid cloud, consistent network performance, data transfer',
+    defaultConfig: {
+      portSpeed: '1Gbps',
+      hoursPerMonth: 730,
+      dataTransferOutGB: 1000
+    },
+    configFields: [
+      { key: 'portSpeed', label: 'Port Speed', type: 'select', options: ['50Mbps', '100Mbps', '200Mbps', '300Mbps', '400Mbps', '500Mbps', '1Gbps', '10Gbps'] },
+      { key: 'hoursPerMonth', label: 'Port Hours/Month', type: 'number', min: 1, max: 730 },
+      { key: 'dataTransferOutGB', label: 'Data Transfer Out (GB)', type: 'number', min: 0, max: 1000000 }
+    ],
+    allowedConnections: ['transitgateway'],
+    defaultPorts: { inbound: [], outbound: [] }
+  },
+
+  // ==================== STORAGE ADDITIONS ====================
+  fsx: {
+    id: 'fsx',
+    name: 'FSx',
+    category: 'storage',
+    color: '#3F8624',
+    icon: '💾',
+    useCase: 'High-performance file systems (Windows, Lustre, NetApp)',
+    whenToUse: 'Windows file shares, HPC workloads, enterprise apps',
+    defaultConfig: {
+      fileSystemType: 'WINDOWS',
+      storageCapacityGB: 300,
+      throughputMBps: 8
+    },
+    configFields: [
+      { key: 'fileSystemType', label: 'File System Type', type: 'select', options: ['WINDOWS', 'LUSTRE', 'ONTAP', 'OPENZFS'] },
+      { key: 'storageCapacityGB', label: 'Storage Capacity (GB)', type: 'number', min: 32, max: 65536 },
+      { key: 'throughputMBps', label: 'Throughput (MB/s)', type: 'number', min: 8, max: 2048 }
+    ],
+    allowedConnections: [],
+    defaultPorts: { inbound: [445, 2049], outbound: [] }
+  },
+
+  backup: {
+    id: 'backup',
+    name: 'AWS Backup',
+    category: 'storage',
+    color: '#3F8624',
+    icon: '💼',
+    useCase: 'Centralized backup across AWS services',
+    whenToUse: 'Automated backups, disaster recovery, compliance',
+    defaultConfig: {
+      storageGB: 500,
+      restoreJobs: 10
+    },
+    configFields: [
+      { key: 'storageGB', label: 'Backup Storage (GB)', type: 'number', min: 0, max: 1000000 },
+      { key: 'restoreJobs', label: 'Restore Jobs/Month', type: 'number', min: 0, max: 1000 }
+    ],
+    allowedConnections: ['rds', 'dynamodb', 's3', 'efs', 'ec2'],
+    defaultPorts: { inbound: [], outbound: [] }
   }
 };
 
@@ -930,6 +1339,44 @@ export const connectionDefaults = {
   'ssm->ec2': { port: 443, protocol: 'HTTPS' },
   'acm->cloudfront': { port: 443, protocol: 'HTTPS' },
   'acm->alb': { port: 443, protocol: 'HTTPS' },
+  // New services
+  'ecr->ecs': { port: 443, protocol: 'HTTPS' },
+  'ecr->eks': { port: 443, protocol: 'HTTPS' },
+  'ecr->lambda': { port: 443, protocol: 'HTTPS' },
+  'ecr->apprunner': { port: 443, protocol: 'HTTPS' },
+  'stepfunctions->lambda': { port: 443, protocol: 'HTTPS' },
+  'stepfunctions->sqs': { port: 443, protocol: 'HTTPS' },
+  'stepfunctions->sns': { port: 443, protocol: 'HTTPS' },
+  'stepfunctions->dynamodb': { port: 443, protocol: 'HTTPS' },
+  'cloudwatch->sns': { port: 443, protocol: 'HTTPS' },
+  'cloudwatch->lambda': { port: 443, protocol: 'HTTPS' },
+  // AI/ML services
+  'sagemaker->s3': { port: 443, protocol: 'HTTPS' },
+  'sagemaker->ecr': { port: 443, protocol: 'HTTPS' },
+  'bedrock->lambda': { port: 443, protocol: 'HTTPS' },
+  'bedrock->apigateway': { port: 443, protocol: 'HTTPS' },
+  // DevOps services
+  'codepipeline->codebuild': { port: 443, protocol: 'HTTPS' },
+  'codepipeline->codedeploy': { port: 443, protocol: 'HTTPS' },
+  'codepipeline->s3': { port: 443, protocol: 'HTTPS' },
+  'codebuild->s3': { port: 443, protocol: 'HTTPS' },
+  'codebuild->ecr': { port: 443, protocol: 'HTTPS' },
+  'codedeploy->ec2': { port: 443, protocol: 'HTTPS' },
+  'codedeploy->ecs': { port: 443, protocol: 'HTTPS' },
+  'codedeploy->lambda': { port: 443, protocol: 'HTTPS' },
+  // Networking
+  'appsync->dynamodb': { port: 443, protocol: 'HTTPS' },
+  'appsync->lambda': { port: 443, protocol: 'HTTPS' },
+  'appsync->rds': { port: 5432, protocol: 'TCP' },
+  'directconnect->transitgateway': { port: 443, protocol: 'HTTPS' },
+  // Security
+  'shield->cloudfront': { port: 443, protocol: 'HTTPS' },
+  'shield->alb': { port: 443, protocol: 'HTTPS' },
+  // Storage
+  'backup->rds': { port: 443, protocol: 'HTTPS' },
+  'backup->dynamodb': { port: 443, protocol: 'HTTPS' },
+  'backup->s3': { port: 443, protocol: 'HTTPS' },
+  'backup->efs': { port: 443, protocol: 'HTTPS' },
 };
 
 export const getConnectionDefault = (sourceType, targetType) => {
@@ -938,14 +1385,14 @@ export const getConnectionDefault = (sourceType, targetType) => {
 };
 
 export const serviceCategories = [
+  { id: 'infrastructure', name: 'Infrastructure', color: '#232F3E' },
   { id: 'compute', name: 'Compute', color: '#FF9900' },
   { id: 'storage', name: 'Storage', color: '#3F8624' },
   { id: 'database', name: 'Database', color: '#3B48CC' },
   { id: 'networking', name: 'Networking', color: '#8C4FFF' },
   { id: 'messaging', name: 'Messaging', color: '#FF4F8B' },
   { id: 'security', name: 'Security', color: '#DD344C' },
-  { id: 'analytics', name: 'Analytics', color: '#A166FF' },
-  { id: 'infrastructure', name: 'Infrastructure', color: '#232F3E' }
+  { id: 'analytics', name: 'Analytics', color: '#A166FF' }
 ];
 
 // Container/Group type definitions

@@ -115,11 +115,30 @@
 }
 
 .form-group label {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 5px;
   font-weight: 500;
   color: var(--text-primary, #fff);
   font-size: 0.9rem;
+}
+
+.help-link {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  text-decoration: none;
+  padding: 0;
+  margin-left: auto;
+  transition: opacity 0.2s;
+}
+
+.help-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
 }
 
 .form-input {
@@ -321,6 +340,17 @@
 
 .history-date {
   color: var(--text-secondary, #aaa);
+}
+
+.history-region-detail {
+  color: #007bff;
+  font-size: 0.85rem;
+}
+
+.history-cost {
+  color: #51cf66;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .history-error {

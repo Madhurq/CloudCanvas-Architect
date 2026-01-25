@@ -106,15 +106,15 @@ const SaveArchitectureModal = ({ isOpen, onClose }) => {
           {error && <div className="error-message">{error}</div>}
 
           <div className="modal-footer">
-            <button 
-              className="btn btn-secondary" 
+            <button
+              className="btn btn-secondary"
               onClick={onClose}
               disabled={loading}
             >
               Cancel
             </button>
-            <button 
-              className="btn btn-primary" 
+            <button
+              className="btn btn-primary"
               onClick={handleSave}
               disabled={loading || !name.trim()}
             >

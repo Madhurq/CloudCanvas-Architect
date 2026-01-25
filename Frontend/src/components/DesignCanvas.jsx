@@ -22,7 +22,7 @@ const VPC_INDEPENDENT_SERVICES = ['vpc', 'security_group', 'subnet_public', 'sub
 
 // Services that require VPC to be created first
 const VPC_REQUIRED_SERVICES = [
-    'ec2', 'ecs', 'eks', 'lambda', 'rds', 'elasticache', 'alb', 'nlb', 
+    'ec2', 'ecs', 'eks', 'lambda', 'rds', 'elasticache', 'alb', 'nlb',
     'aurora', 'redshift', 'opensearch', 'mq', 'msk', 'batch', 'lightsail',
     'apprunner', 'nat_gateway', 'efs'
 ];
@@ -171,15 +171,15 @@ const DesignCanvasInner = () => {
                 const vpcX = vpcNode.position.x;
                 const vpcY = vpcNode.position.y;
                 const headerHeight = 50;
-                
+
                 // Calculate position relative to VPC
                 let relativeX = position.x - vpcX - 100;
                 let relativeY = position.y - vpcY - 50;
-                
+
                 // Ensure within VPC bounds
                 relativeX = Math.max(10, Math.min(relativeX, (vpcNode.style?.width || 500) - 220));
                 relativeY = Math.max(headerHeight + 10, Math.min(relativeY, (vpcNode.style?.height || 350) - 120));
-                
+
                 addNode(serviceType, { x: relativeX, y: relativeY }, vpcNode.id);
                 return;
             }
@@ -246,14 +246,14 @@ const DesignCanvasInner = () => {
                         </div>
                         <div className="vpc-warning-body">
                             <p>
-                                Before adding <strong>{pendingService?.toUpperCase()}</strong> or other AWS services, 
+                                Before adding <strong>{pendingService?.toUpperCase()}</strong> or other AWS services,
                                 you need to create a <strong>VPC (Virtual Private Cloud)</strong> first.
                             </p>
                             <div className="vpc-steps">
                                 <h4>Getting Started:</h4>
                                 <ol>
                                     <li>
-                                        <strong>Create a VPC</strong> - Drag the VPC container from the 
+                                        <strong>Create a VPC</strong> - Drag the VPC container from the
                                         <span className="highlight"> Networking</span> category onto the canvas
                                     </li>
                                     <li>

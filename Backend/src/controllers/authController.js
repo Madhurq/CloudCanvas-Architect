@@ -125,7 +125,7 @@ export const getProfile = async (req, res) => {
 // Expects: { idToken }
 export const syncFirebaseUser = async (req, res) => {
   const { idToken } = req.body;
-  
+
   // Initialize variables outside try so catch can see them
   let email = null;
   let uid = null;
@@ -165,7 +165,7 @@ export const syncFirebaseUser = async (req, res) => {
       logger.warn(`Conflict detected for ${email}, recovering...`);
       try {
         const recovery = await pool.query(
-          'SELECT * FROM users WHERE email = $1 OR provider_id = $2', 
+          'SELECT * FROM users WHERE email = $1 OR provider_id = $2',
           [email, uid]
         );
         if (recovery.rows.length > 0) {
@@ -182,3 +182,64 @@ export const syncFirebaseUser = async (req, res) => {
     return res.status(401).json(formatResponse(false, null, 'Firebase sync failed'));
   }
 };
+
+// Update user profile (first_name, last_name)
+export const updateProfile = async (req, res) => {
+  const { firstName, lastName } = req.body;
+  const userId = req.user.userId;
+
+  try {
+    // Build dynamic update query based on provided fields
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (firstName !== undefined) {
+      updates.push(`first_name = $${paramCount++}`);
+      values.push(firstName);
+    }
+
+    if (lastName !== undefined) {
+      updates.push(`last_name = $${paramCount++}`);
+      values.push(lastName);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json(formatResponse(false, null, 'No fields to update'));
+    }
+
+    // Add updated_at
+    updates.push(`updated_at = CURRENT_TIMESTAMP`);
+
+    // Add user ID
+    values.push(userId);
+
+    const query = `
+      UPDATE users 
+      SET ${updates.join(', ')} 
+      WHERE id = $${paramCount}
+      RETURNING id, email, first_name, last_name, organization, role, created_at, updated_at
+    `;
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json(formatResponse(false, null, 'User not found'));
+    }
+
+    const user = result.rows[0];
+
+    // Log audit
+    await pool.query(
+      'INSERT INTO audit_logs (user_id, action, entity_type, changes) VALUES ($1, $2, $3, $4)',
+      [userId, 'PROFILE_UPDATED', 'users', JSON.stringify({ firstName, lastName })]
+    );
+
+    logger.info(`Profile updated for user: ${userId}`);
+    res.json(formatResponse(true, { user }));
+  } catch (error) {
+    logger.error('Update profile error:', error);
+    res.status(500).json(formatResponse(false, null, 'Failed to update profile'));
+  }
+};
+
