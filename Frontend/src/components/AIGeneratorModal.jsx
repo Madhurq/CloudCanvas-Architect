@@ -14,10 +14,6 @@ const AIGeneratorModal = ({ isOpen, onClose }) => {
       setError("Please describe your system.");
       return;
     }
-    if (!apiKey) {
-      setError("Google Gemini API Key is required for this mode.");
-      return;
-    }
     
     setIsLoading(true);
     setError('');
