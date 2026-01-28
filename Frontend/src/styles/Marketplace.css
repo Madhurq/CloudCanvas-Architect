@@ -533,6 +533,7 @@
 
 /* Responsive */
 @media (max-width: 768px) {
+
   .marketplace-modal,
   .publish-modal {
     width: 95%;
@@ -562,3 +563,5 @@
 
   .review-actions .btn {
     width: 100%;
+  }
+}
