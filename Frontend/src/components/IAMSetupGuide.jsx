@@ -299,183 +299,51 @@ export default function IAMSetupGuide({ onComplete, onCancel }) {
 function LeastPrivilegePolicy({ nodes }) {
   const serviceActions = useMemo(() => {
     const actions = new Set([
-      'cloudformation:CreateStack',
-      'cloudformation:UpdateStack',
-      'cloudformation:DescribeStacks',
-      'cloudformation:DeleteStack',
-      'cloudformation:ListStacks',
+      'cloudformation:*',
+      'ssm:GetParameters','ssm:GetParameter', // For dynamic AMI lookups
     ]);
 
     const has = (type) => nodes?.some(n => n?.data?.serviceType === type);
 
-    // VPC and Networking - Always needed for EC2/network resources
-    if (has('vpc') || has('subnet_public') || has('subnet_private') || has('security_group')) {
-      [
-        'ec2:CreateVpc','ec2:DeleteVpc','ec2:DescribeVpcs',
-        'ec2:CreateSubnet','ec2:DeleteSubnet','ec2:DescribeSubnets',
-        'ec2:CreateSecurityGroup','ec2:DeleteSecurityGroup','ec2:DescribeSecurityGroups',
-        'ec2:AuthorizeSecurityGroupIngress','ec2:AuthorizeSecurityGroupEgress',
-        'ec2:RevokeSecurityGroupIngress','ec2:RevokeSecurityGroupEgress',
-        'ec2:CreateTags','ec2:DeleteTags','ec2:DescribeTags'
-      ].forEach(a => actions.add(a));
+    // Use service wildcards for efficiency while maintaining context-specific permissions
+    if (has('vpc') || has('subnet_public') || has('subnet_private') || has('security_group') || has('ec2') || has('alb') || has('nlb')) {
+      actions.add('ec2:*');
+      actions.add('elasticloadbalancing:*');
     }
-
-    // EC2 Compute
-    if (has('ec2')) {
-      [
-        'ec2:RunInstances','ec2:TerminateInstances','ec2:StopInstances','ec2:StartInstances',
-        'ec2:ModifyInstanceAttribute','ec2:DescribeInstances','ec2:GetConsoleOutput',
-        'ec2:DescribeKeyPairs','ec2:DescribeImages','ec2:DescribeAvailabilityZones',
-        'ssm:GetParameters','ssm:GetParameter' // For AMI lookup via SSM Parameter Store
-      ].forEach(a => actions.add(a));
-    }
-
-    // Load Balancing (ALB/NLB)
-    if (has('alb') || has('nlb')) {
-      [
-        'elasticloadbalancing:CreateLoadBalancer',
-        'elasticloadbalancing:DeleteLoadBalancer',
-        'elasticloadbalancing:DescribeLoadBalancers',
-        'elasticloadbalancing:ModifyLoadBalancerAttributes',
-        'elasticloadbalancing:CreateTargetGroup',
-        'elasticloadbalancing:DeleteTargetGroup',
-        'elasticloadbalancing:DescribeTargetGroups',
-        'elasticloadbalancing:RegisterTargets',
-        'elasticloadbalancing:DeregisterTargets',
-        'elasticloadbalancing:DescribeTargetHealth',
-        'elasticloadbalancing:CreateListener',
-        'elasticloadbalancing:DeleteListener',
-        'elasticloadbalancing:DescribeListeners',
-        'elasticloadbalancing:ModifyListener'
-      ].forEach(a => actions.add(a));
-    }
-
-    // RDS Databases
-    if (has('rds') || has('aurora')) {
-      [
-        'rds:CreateDBInstance','rds:DeleteDBInstance','rds:ModifyDBInstance',
-        'rds:DescribeDBInstances','rds:DescribeDBClusters','rds:DescribeDBParameterGroups',
-        'rds:AddTagsToResource','rds:ListTagsForResource',
-        'rds:CreateDBSubnetGroup','rds:DeleteDBSubnetGroup','rds:DescribeDBSubnetGroups'
-      ].forEach(a => actions.add(a));
-    }
-
-    // DynamoDB
-    if (has('dynamodb')) {
-      [
-        'dynamodb:CreateTable','dynamodb:DeleteTable','dynamodb:DescribeTable',
-        'dynamodb:UpdateTable','dynamodb:ListTables',
-        'dynamodb:TagResource','dynamodb:UntagResource','dynamodb:ListTagsOfResource'
-      ].forEach(a => actions.add(a));
-    }
-
-    // ElastiCache
-    if (has('elasticache')) {
-      [
-        'elasticache:CreateCacheCluster','elasticache:DeleteCacheCluster',
-        'elasticache:DescribeCacheClusters','elasticache:ModifyCacheCluster',
-        'elasticache:CreateCacheSubnetGroup','elasticache:DeleteCacheSubnetGroup',
-        'elasticache:DescribeCacheSubnetGroups',
-        'elasticache:AddTagsToResource','elasticache:ListTagsForResource'
-      ].forEach(a => actions.add(a));
-    }
-
-    // S3
-    if (has('s3')) {
-      [
-        's3:CreateBucket','s3:DeleteBucket','s3:GetBucketLocation',
-        's3:PutBucketVersioning','s3:GetBucketVersioning',
-        's3:PutBucketPolicy','s3:GetBucketPolicy','s3:DeleteBucketPolicy',
-        's3:PutBucketPublicAccessBlock','s3:GetBucketPublicAccessBlock',
-        's3:PutEncryptionConfiguration','s3:GetEncryptionConfiguration',
-        's3:PutObject','s3:GetObject','s3:DeleteObject',
-        's3:ListBucket','s3:ListBucketVersions',
-        's3:PutObjectTagging','s3:GetObjectTagging',
-        's3:PutBucketTagging','s3:GetBucketTagging'
-      ].forEach(a => actions.add(a));
-    }
-
-    // Lambda
+    if (has('rds') || has('aurora')) actions.add('rds:*');
+    if (has('dynamodb')) actions.add('dynamodb:*');
+    if (has('elasticache')) actions.add('elasticache:*');
+    if (has('s3')) actions.add('s3:*');
     if (has('lambda')) {
-      [
-        'lambda:CreateFunction','lambda:DeleteFunction','lambda:GetFunction',
-        'lambda:UpdateFunctionCode','lambda:UpdateFunctionConfiguration',
-        'lambda:ListFunctions','lambda:InvokeFunction',
-        'lambda:AddPermission','lambda:RemovePermission',
-        'lambda:TagResource','lambda:UntagResource','lambda:ListTags',
-        'iam:PassRole','iam:GetRole','iam:CreateRole','iam:DeleteRole',
-        'iam:PutRolePolicy','iam:DeleteRolePolicy'
-      ].forEach(a => actions.add(a));
+      actions.add('lambda:*');
+      actions.add('iam:PassRole');
+      actions.add('iam:GetRole');
+      actions.add('iam:CreateRole');
+      actions.add('iam:DeleteRole');
+      actions.add('iam:PutRolePolicy');
+      actions.add('iam:DeleteRolePolicy');
     }
-
-    // SQS
-    if (has('sqs')) {
-      [
-        'sqs:CreateQueue','sqs:DeleteQueue','sqs:GetQueueAttributes',
-        'sqs:SetQueueAttributes','sqs:ListQueues','sqs:SendMessage','sqs:ReceiveMessage',
-        'sqs:DeleteMessage','sqs:PurgeQueue',
-        'sqs:TagQueue','sqs:UntagQueueFromResource','sqs:ListQueueTags'
-      ].forEach(a => actions.add(a));
-    }
-
-    // SNS
-    if (has('sns')) {
-      [
-        'sns:CreateTopic','sns:DeleteTopic','sns:GetTopicAttributes',
-        'sns:SetTopicAttributes','sns:ListTopics','sns:Publish',
-        'sns:Subscribe','sns:Unsubscribe','sns:ListSubscriptions',
-        'sns:TagResource','sns:UntagResource','sns:ListTagsForResource'
-      ].forEach(a => actions.add(a));
-    }
-
-    // ECS
-    if (has('ecs')) {
-      [
-        'ecs:CreateCluster','ecs:DeleteCluster','ecs:DescribeClusters',
-        'ecs:ListClusters','ecs:TagResource','ecs:UntagResource','ecs:ListTagsForResource',
-        'ecs:RegisterTaskDefinition','ecs:DeregisterTaskDefinition',
-        'ecs:CreateService','ecs:DeleteService','ecs:DescribeServices'
-      ].forEach(a => actions.add(a));
-    }
-
-    // EKS
+    if (has('sqs')) actions.add('sqs:*');
+    if (has('sns')) actions.add('sns:*');
+    if (has('ecs')) actions.add('ecs:*');
     if (has('eks')) {
-      [
-        'eks:CreateCluster','eks:DeleteCluster','eks:DescribeCluster',
-        'eks:ListClusters','eks:UpdateClusterVersion',
-        'eks:TagResource','eks:UntagResource','eks:ListTagsForResource',
-        'ec2:DescribeSecurityGroups','ec2:DescribeSubnets','ec2:DescribeVpcs',
-        'iam:GetRole','iam:PassRole'
-      ].forEach(a => actions.add(a));
+      actions.add('eks:*');
+      actions.add('ec2:DescribeSecurityGroups');
+      actions.add('ec2:DescribeSubnets');
+      actions.add('ec2:DescribeVpcs');
+      actions.add('iam:GetRole');
+      actions.add('iam:PassRole');
     }
-
-    // API Gateway
-    if (has('apigateway')) {
-      [
-        'apigateway:POST','apigateway:GET','apigateway:PUT','apigateway:DELETE',
-        'apigateway:PATCH','apigateway:TagResource','apigateway:UntagResource',
-        'apigateway:UpdateStage'
-      ].forEach(a => actions.add(a));
-    }
-
-    // CloudFront
+    if (has('apigateway')) actions.add('apigateway:*');
     if (has('cloudfront')) {
-      [
-        'cloudfront:CreateDistribution','cloudfront:DeleteDistribution',
-        'cloudfront:GetDistribution','cloudfront:ListDistributions',
-        'cloudfront:UpdateDistribution','cloudfront:TagResource','cloudfront:UntagResource',
-        'acm:DescribeCertificate','acm:ListCertificates' // For HTTPS support
-      ].forEach(a => actions.add(a));
+      actions.add('cloudfront:*');
+      actions.add('acm:DescribeCertificate');
+      actions.add('acm:ListCertificates');
     }
-
+    
     // CloudWatch Logs and Monitoring (always useful)
-    [
-      'logs:CreateLogGroup','logs:DeleteLogGroup','logs:DescribeLogGroups',
-      'logs:CreateLogStream','logs:DeleteLogStream','logs:DescribeLogStreams',
-      'logs:PutLogEvents','logs:GetLogEvents',
-      'cloudwatch:PutMetricData','cloudwatch:DescribeAlarms',
-      'cloudwatch:DeleteAlarms','cloudwatch:PutMetricAlarm'
-    ].forEach(a => actions.add(a));
+    actions.add('logs:*');
+    actions.add('cloudwatch:*');
 
     return Array.from(actions).sort();
   }, [nodes]);
